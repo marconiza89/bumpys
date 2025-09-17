@@ -4,7 +4,7 @@ import { memo, useEffect, useMemo } from "react";
 import { BasicPad, BotTrapPad, DoubleTrapPad, DownDoor, GreenPad, IcePad, LBouncer, Ltrampoline, RBouncer, Rtrampoline, TopTrapPad, UpDoor } from "@/levels/assets/Pads";
 import { LevelData } from "./types/LevelTypes";
 import { cellsMap, coordToWorld, enumerateCoords } from "./utils/Grid";
-import { Player } from "./actors/Player";
+import {Player} from "./actors/player/Player";
 import { useItemsStore } from "@/levels/state/itemsStore";
 import { ItemAtCoord } from "@/levels/util/ItemAtCoord";
 import { ExitDoor } from "@/levels/assets/ExitDoor";
