@@ -1,0 +1,57 @@
+Struttura proposta
+
+levels/actors/Player/
+
+Player.tsx
+Orchestratore: istanzia hook/controller, crea i ref, renderizza Visuals e Audio, chiama i tick in useFrame, connette eventi (padEvents, itemsStore).
+constants.ts
+Tutti i “magic numbers” attuali (BPM, altezze palla, durate, velocità, colori se servono).
+types.ts
+Tipi comuni: VState = "idle" | "ascend" | "descend", MoveKind = "none" | "side" | "vertical".
+Interfacce dei controller: BounceController, MovementController, InputController, GridHelpers.
+hooks/usePlayerGrid.ts
+Responsabilità: calcolo righe/colonne, padMap, isPadAt, toCoord, computeWorld, spawn (row/col iniziali).
+API: { rows, colStart, colEnd, rowsCount, colsCount, tileSize, toCoord, computeWorld, isPadAt, getSpawn() }.
+hooks/usePlayerInput.ts
+Responsabilità: gestione tastiera, pending side in aria, accodamento comandi in idle.
+API: { bind(), unbind(), stateRef, consumeImmediateLeftRight(), queueOnGround(action) }.
+Fornisce refs left/right/up/down e pendingSideRef, con metodi per “consumare” gli input frame-by-frame.
+hooks/useBounce.ts
+Responsabilità: rimbalzo della palla in idle, gestione ciclo, ground-touch, queueGroundAction.
+API: { attach(ballRef), start(), pause(), resumeFromGround(), ensureIfIdle(), queueGroundAction(fn), tick(dt, { isIdle, isMoving, moveKind }), onGroundTouch(cb) // callback invocata al touch }.
+hooks/useMovement.ts
+Responsabilità: movimento tra celle, profilo ad arco laterale, wall-bounce singolo, velocità/tempi, change di vState.
+API: { attach(groupRef, ballRef, wallAudioRef), setVState(next), getVState(), setGridPosition(row, col), tryMoveSide(dir), tryAscend(), tryDescend(), performWallBounce(dir), tick(dt), onArrived(cb) // callback a destinazione }.
+Internamente usa GridHelpers e notifica: onArrived -> raccolta item + eventuale resume bounce; espone metodi usati dall’orchestratore o da Input/Bounce.
+components/PlayerVisuals.tsx
+Responsabilità: render del modello (Bumpy) + shadow-plane.
+API: component con forwardRef di:
+groupRef (root del player)
+ballRef (nodo palla per animare Y)
+Props: opzionale offset/z (BALL_Z), shadow on/off.
+components/PlayerAudio.tsx
+Responsabilità: istanzia e prepara l’audio di wall impact (PositionalAudio).
+API: forwardRef wallAudioRef.
+Eventualmente una piccola API playWallImpact(rate?).
+hooks/usePlayerOrchestrator.ts (opzionale, se vogliamo ultra-pulito)
+Responsabilità: incapsula l’intero wiring tra Grid, Input, Bounce, Movement, ItemsStore e PadEvents.
+API: { refs, grid, movement, bounce, input, onFrame(dt) }.
+Flusso dati (alto livello)
+
+Player.tsx:
+Inizializza Grid (usePlayerGrid) e calcola spawn.
+Crea ref: groupRef, ballRef, wallAudioRef.
+Crea controller: useBounce, useMovement, usePlayerInput.
+Collega controller:
+bounce.attach(ballRef); movement.attach(groupRef, ballRef, wallAudioRef).
+bounce.onGroundTouch(() => publishPadEvent(coord, "bounce") e consumare eventuale comando accodato)
+movement.onArrived(() => collect item; se vState === "idle" -> bounce.resumeFromGround()).
+Gestione input:
+In idle: queueGroundAction(() => tilt + side/jump)
+In ascend: side immediato; in descend: no side, solo caduta.
+useFrame:
+bounce.tick(dt, { isIdle, isMoving, moveKind })
+movement.tick(dt)
+risoluzione comandi (left/right/up/down) tramite input controller e metodi di movement.
+ItemsStore: invariato; viene invocato su spawn e in onArrived.
+PadEvents: tilt/bounce/trampoline inviati nei medesimi momenti di prima.

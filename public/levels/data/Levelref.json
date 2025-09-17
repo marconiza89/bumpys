@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "id": "lvl-001",
+    "name": "Level 1",
+    "grid": { "rows": "A-F", "cols": [1,8], "tileSize": 1.0 },
+    "theme": "factory"    
+  },
+  "defaults": {
+    "pad": "empty",
+    "item": "none",
+    "brick": "empty"
+  },
+  "cells": [
+    { "coord": "B2", "pad": "rbouncer", "item": "none" },
+    { "coord": "B3", "pad": "green2", "item": "none" },
+    { "coord": "B4", "pad": "ice", "item": "chips" },
+    { "coord": "B5", "pad": "ice", "item": "chips" },
+    { "coord": "B6", "pad": "green2", "item": "none" },
+    { "coord": "B7", "pad": "lbouncer", "item": "none" },
+
+
+    { "coord": "D1", "pad": "normal", "item": "none" },
+    { "coord": "D2", "pad": "normal", "item": "none" },
+    { "coord": "D3", "pad": "updoor", "item": "none" },
+    { "coord": "D4", "pad": "rtrampoline", "item": "none", "brick": "ldoor" },
+    { "coord": "D5", "pad": "ltrampoline", "item": "none" },
+    { "coord": "D6", "pad": "downdoor", "item": "none", "brick": "rdoor" },
+    { "coord": "D7", "pad": "normal", "item": "none" },
+    { "coord": "D8", "pad": "normal", "item": "none" },
+
+    { "coord": "E2", "pad": "toptrap", "item": "none" },
+    { "coord": "E3", "pad": "toptrap", "item": "none" },
+    { "coord": "E6", "pad": "toptrap", "item": "none" },
+    { "coord": "E7", "pad": "toptrap", "item": "none" },
+
+    { "coord": "F1", "pad": "normal", "item": "none" },
+    { "coord": "F5", "pad": "green1", "item": "none" },
+    { "coord": "F6", "pad": "green1", "item": "none" },
+    { "coord": "F7", "pad": "green1", "item": "none" },
+    { "coord": "F8", "pad": "normal", "item": "none" }
+
+
+  ],
+  "entities": [
+    { "type": "spawner", "coord": "F1" },
+    { "type": "exit", "coord": "A4" }
+  ]
+
+}

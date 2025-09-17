@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "id": "lvl-001",
+    "name": "Level 1",
+    "grid": { "rows": "A-F", "cols": [1,8], "tileSize": 1.0 },
+    "theme": "factory"    
+  },
+  "defaults": {
+    "pad": "empty",
+    "item": "none"
+  },
+  "cells": [
+    { "coord": "A1", "pad": "rbouncer", "item": "none" },
+    { "coord": "A2", "pad": "normal", "item": "strawberry" },
+    { "coord": "A3", "pad": "normal", "item": "ice-cream" },
+    { "coord": "A4", "pad": "normal", "item": "cupcake" },
+    { "coord": "A5", "pad": "normal", "item": "gelato" },
+    { "coord": "A6", "pad": "normal", "item": "cake" },
+    { "coord": "A7", "pad": "normal", "item": "cheesecake" },
+    { "coord": "A8", "pad": "lbouncer", "item": "none" }, 
+    { "coord": "B5", "pad": "normal", "item": "bread" },     
+    { "coord": "C4", "pad": "normal", "item": "drink" },
+    { "coord": "D3", "pad": "normal", "item": "granita"},
+    { "coord": "E2", "pad": "normal", "item": "drink2" },
+    { "coord": "E7", "pad": "doubletrap", "item": "none" },
+    { "coord": "F1", "pad": "normal", "item": "none" }
+
+
+  ],
+  "entities": [
+    { "type": "spawner", "coord": "F1" },
+    { "type": "exit", "coord": "A4" }
+  ]
+
+}

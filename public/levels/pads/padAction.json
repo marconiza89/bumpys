@@ -1,0 +1,40 @@
+{
+    "meta":{
+        "id": "pad-action",
+        "name": "Pad Action",
+        "description": "Player actions for pads"
+    },
+
+    "default": {
+        "IdleBounce": "true",
+        "BottomEntry": "false",
+        "BottomExit": "false",
+        "BounceTopDamage": "false",
+        "BounceBotDamage": "false",
+        "LeftRebounce": "false",
+        "LeftRebounceStrong": "0",
+        "RightRebounce": "false",
+        "RightRebounceStrong": "0",
+        "TopRebouncer": "false",
+        "LeftShoot": "false",
+        "RightShoot": "false",
+        "Consumable": "false",
+        "ConsumableBounce": "3",
+        "IcePad": "false",
+        "ShadowPad": "false"
+    },
+
+    "pads": {
+        "normal": {},
+        "rbouncer": { "RightRebounce": "true", "RightRebounceStrong": "1" },
+        "lbouncer": { "LeftRebounce": "true", "LeftRebounceStrong": "1" },
+        "rtrampoline": { "RightRebounce": "true", "RightRebounceStrong": "2", "TopRebouncer": "true" },
+        "ltrampoline": { "LeftRebounce": "true", "LeftRebounceStrong": "2", "TopRebouncer": "true" },
+        "ice": { "IcePad": "true" },
+        "green1": { "Consumable": "true", "ConsumableBounce": "1" },
+        "green2": { "Consumable": "true", "ConsumableBounce": "2" },
+        "toptrap": { "BounceTopDamage": "true"   },
+        "updoor": { "BottomEntry": "false"  },
+        "downdoor": { "BottomExit": "false" }
+    }
+}

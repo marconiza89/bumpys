@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "id": "lvl-001",
+    "name": "Level 1",
+    "grid": { "rows": "A-F", "cols": [1,15], "tileSize": 1.5 },
+    "theme": "factory"    
+  },
+  "defaults": {
+    "pad": "empty",
+    "item": "none"
+  },
+  "cells": [
+    { "coord": "A1", "pad": "normal", "item": "none" },
+    { "coord": "A3", "pad": "normal", "item": "none" },
+    { "coord": "A5", "pad": "normal", "item": "none" },
+    { "coord": "A7", "pad": "normal", "item": "none" },
+    { "coord": "A9", "pad": "normal", "item": "none" },
+    { "coord": "A11", "pad": "normal", "item": "none" },
+    { "coord": "A13", "pad": "normal", "item": "none" },
+ 
+    { "coord": "B3", "pad": "normal", "item": "none" }, 
+    { "coord": "B7", "pad": "normal", "item": "coin" },
+    { "coord": "B9", "pad": "normal", "item": "none" },
+    { "coord": "B13", "pad": "normal", "item": "none" },
+
+    { "coord": "C3", "pad": "normal", "item": "none" },
+    { "coord": "C7", "pad": "normal", "item": "none" },
+    { "coord": "C9", "pad": "normal", "item": "gelato" },
+    { "coord": "C13", "pad": "normal", "item": "none" },
+
+    { "coord": "D3", "pad": "normal", "item": "ice-stick" },
+    { "coord": "D7", "pad": "normal", "item": "none" },
+    { "coord": "D9", "pad": "normal", "item": "none" },
+    { "coord": "D13", "pad": "normal", "item": "cone" },
+
+    { "coord": "E3", "pad": "normal", "item": "none" },
+    { "coord": "E7", "pad": "normal", "item": "none" },
+    { "coord": "E9", "pad": "normal", "item": "bear" },
+    { "coord": "E13", "pad": "normal", "item": "none" },
+
+    { "coord": "F3", "pad": "normal", "item": "none" },
+    { "coord": "F7", "pad": "normal", "item": "flag" },
+    { "coord": "F9", "pad": "normal", "item": "none" },
+    { "coord": "F13", "pad": "normal", "item": "none" }
+
+  ],
+  "entities": [
+    { "type": "spawner", "coord": "A1" },
+    { "type": "exit", "coord": "A4" }
+  ]
+
+}

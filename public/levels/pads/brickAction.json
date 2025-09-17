@@ -1,0 +1,26 @@
+{
+    "meta":{
+        "id": "brick-action",
+        "name": "Brick Action",
+        "description": "Player actions for bricks, bricks are only on left of the pad"
+    },
+
+    "default": {
+        "FromLeftEntry": "true",
+        "LeftExit": "true",        
+        "CountDown": "false",
+        "CountDownTime": "3",
+        "FromLeftEntryDamage": "false",
+        "LeftExitDamage": "false"     
+        
+    },
+
+    "bricks": {
+        "empty": {},
+        "rdoor": { "LeftExit": "false" },
+        "ldoor": { "FromLeftEntry": "false" },
+        "countdown": { "CountDown": "true", "CountDownTime": "3" },
+        "rdoorD": { "FromLeftEntryDamage": "true" },
+        "ldoorD": { "LeftExitDamage": "true" }
+    }
+}
