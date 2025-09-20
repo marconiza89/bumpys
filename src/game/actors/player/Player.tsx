@@ -1,6 +1,5 @@
-// src/game/actors/Player.tsx
 import { useEffect, useMemo, useRef } from "react";
-import { Group, Mesh, PositionalAudio as ThreePositionalAudio } from "three";
+import { BufferGeometry, Group, Material, Mesh, PositionalAudio as ThreePositionalAudio } from "three";
 import { useFrame } from "@react-three/fiber";
 import { PositionalAudio } from "@react-three/drei";
 import { LevelData } from "@/game/types/LevelTypes";
@@ -19,7 +18,7 @@ type PlayerProps = {
 export function Player({ data }: PlayerProps) {
     // Refs for 3D objects - properly typed
     const groupRef = useRef<Group | null>(null);
-    const ballRef = useRef<Mesh>(null);
+    const ballRef = useRef<Mesh<BufferGeometry, Material | Material[]> | null>(null);
     const tiltNodeRef = useRef<Group | null>(null);
     const springPivotRef = useRef<Group | null>(null);
     
@@ -37,10 +36,16 @@ export function Player({ data }: PlayerProps) {
     const playerState = usePlayerStore();
     const { position, physics, verticalState } = playerState;
     
-    // Initialize player on mount
+    // Initialize player and group position
     useEffect(() => {
         movementSystem.initializePlayer();
         inputHandler.attachEventListeners();
+        
+        // Set initial group position after player is initialized
+        const playerState = usePlayerStore.getState();
+        if (groupRef.current && playerState.position.worldPosition.length() > 0) {
+            groupRef.current.position.copy(playerState.position.worldPosition);
+        }
         
         return () => {
             inputHandler.detachEventListeners();
@@ -48,13 +53,6 @@ export function Player({ data }: PlayerProps) {
             useInteractionStore.getState().reset();
         };
     }, [movementSystem, inputHandler]);
-    
-    // Update group position when player position changes
-    useEffect(() => {
-        if (groupRef.current) {
-            groupRef.current.position.copy(position.worldPosition);
-        }
-    }, [position.worldPosition]);
     
     // Subscribe to pad events for audio and animation triggers
     useEffect(() => {
@@ -113,6 +111,14 @@ export function Player({ data }: PlayerProps) {
     // Main frame update
     useFrame((_, deltaTime) => {
         const dt = Math.min(0.033, Math.max(0.001, deltaTime));
+        
+        // Ensure group position is synced with player world position when not moving
+        if (!physics.moving && !physics.wallBounce.active && groupRef.current) {
+            const currentDistance = groupRef.current.position.distanceTo(position.worldPosition);
+            if (currentDistance > 0.001) {
+                groupRef.current.position.copy(position.worldPosition);
+            }
+        }
         
         // Update bounce animation
         physicsSystem.updateBounce(dt, ballRef);

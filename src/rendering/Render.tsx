@@ -21,7 +21,7 @@ export function Render() {
     useEffect(() => {
         let active = true;
         (async () => {
-            const res = await fetch("/levels/data/Levelref.json");
+            const res = await fetch("/levels/data/Level2.json");
             const data = (await res.json()) as LevelData;
             if (active) setLevel(data);
         })();
@@ -48,7 +48,7 @@ export function Render() {
 function Sfondo() {
     const texture = useTexture("/sfondo2.png");
     return (
-        <mesh position={[0, -1.2, -0.6]}>
+        <mesh position={[0, -1.2, -1]}>
             <planeGeometry args={[10, 10]} />
             <meshStandardMaterial color={"#002080"} map={texture} />
         </mesh>

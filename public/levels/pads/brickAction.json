@@ -7,7 +7,10 @@
 
     "default": {
         "FromLeftEntry": "true",
-        "LeftExit": "true",        
+        "LeftExit": "true",  
+        
+        "FromRightEntry": "true",
+        "RightExit": "true",
         "CountDown": "false",
         "CountDownTime": "3",
         "FromLeftEntryDamage": "false",
@@ -17,8 +20,8 @@
 
     "bricks": {
         "empty": {},
-        "rdoor": { "LeftExit": "false" },
-        "ldoor": { "FromLeftEntry": "false" },
+        "rdoor": { "RightExit": "false" },
+        "ldoor": {  "LeftExit": "false" },
         "countdown": { "CountDown": "true", "CountDownTime": "3" },
         "rdoorD": { "FromLeftEntryDamage": "true" },
         "ldoorD": { "LeftExitDamage": "true" }

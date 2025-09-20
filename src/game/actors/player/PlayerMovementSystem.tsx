@@ -88,7 +88,9 @@ export class PlayerMovementSystem {
         const worldPos = this.computeWorldPosition(spawnRow, spawnCol);
         const playerStore = usePlayerStore.getState();
         
+        // Set both current position AND target to spawn location
         playerStore.setPosition(spawnRow, spawnCol, worldPos);
+        playerStore.physics.targetWorld.copy(worldPos);
         playerStore.setVerticalState(this.isPadAt(spawnRow, spawnCol) ? "idle" : "descend");
         
         // Collect item at spawn
@@ -110,12 +112,14 @@ export class PlayerMovementSystem {
             return false;
         }
         
-        // Execute side movement
-        const worldPos = this.computeWorldPosition(rowIndex, toCol);
+        // Calculate target world position but don't update current position yet
+        const targetWorldPos = this.computeWorldPosition(rowIndex, toCol);
         const distance = this.tileSize;
         const speed = distance / this.SIDE_MOVE_DURATION_SEC;
         
-        playerState.setPosition(rowIndex, toCol, worldPos);
+        // Update grid position and target, but current world position stays for gradual movement
+        playerState.setPosition(rowIndex, toCol, playerState.position.worldPosition); // Keep current world pos
+        playerState.physics.targetWorld.copy(targetWorldPos); // Set target for movement
         playerState.setMoving(true, "side");
         playerState.physics.currentSpeed = speed;
         playerState.pauseBounce();
@@ -136,10 +140,12 @@ export class PlayerMovementSystem {
             return false;
         }
         
-        const worldPos = this.computeWorldPosition(upRow, colIndex);
+        const targetWorldPos = this.computeWorldPosition(upRow, colIndex);
         const speed = this.tileSize / this.DEFAULT_STEP_DURATION;
         
-        playerState.setPosition(upRow, colIndex, worldPos);
+        // Update grid position and target, but current world position stays for gradual movement
+        playerState.setPosition(upRow, colIndex, playerState.position.worldPosition); // Keep current world pos
+        playerState.physics.targetWorld.copy(targetWorldPos); // Set target for movement
         playerState.setMoving(true, "vertical");
         playerState.physics.currentSpeed = speed;
         
@@ -167,10 +173,12 @@ export class PlayerMovementSystem {
             return false;
         }
         
-        const worldPos = this.computeWorldPosition(downRow, colIndex);
+        const targetWorldPos = this.computeWorldPosition(downRow, colIndex);
         const speed = this.tileSize / this.DEFAULT_STEP_DURATION;
         
-        playerState.setPosition(downRow, colIndex, worldPos);
+        // Update grid position and target, but current world position stays for gradual movement
+        playerState.setPosition(downRow, colIndex, playerState.position.worldPosition); // Keep current world pos
+        playerState.physics.targetWorld.copy(targetWorldPos); // Set target for movement
         playerState.setMoving(true, "vertical");
         playerState.physics.currentSpeed = speed;
         
@@ -193,6 +201,9 @@ export class PlayerMovementSystem {
         const playerState = usePlayerStore.getState();
         const { rowIndex, colIndex } = playerState.position;
         const { verticalState, physics } = playerState;
+        
+        // Update actual world position to match target now that movement is complete
+        playerState.position.worldPosition.copy(physics.targetWorld);
         
         // Collect items
         const coord = this.toCoord(rowIndex, colIndex);
@@ -462,3 +473,4 @@ export class PlayerMovementSystem {
         return this.toCoord(rowIndex, colIndex);
     }
 }
+

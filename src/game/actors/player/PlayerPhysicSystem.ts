@@ -175,28 +175,33 @@ export class PlayerPhysicsSystem {
         
         if (!physics.moving || !groupRef.current) return false;
         
-        const pos = groupRef.current.position;
-        const dir = physics.targetWorld.clone().sub(pos);
+        const currentPos = groupRef.current.position;
+        const targetPos = physics.targetWorld;
+        const dir = targetPos.clone().sub(currentPos);
         const dist = dir.length();
         
         // Handle side movement arc
         if (physics.moveKind === "side" && ballRef.current) {
-            const initialDist = physics.targetWorld.distanceTo(new Vector3().copy(pos));
+            // Calculate initial distance for arc animation
+            const initialDist = playerState.position.worldPosition.distanceTo(targetPos);
             const t = 1 - Math.max(0, Math.min(1, dist / Math.max(1e-6, initialDist)));
             const y = this.BALL_MIN_Y + (this.BALL_MAX_Y - this.BALL_MIN_Y) * Math.sin(Math.PI * t);
             ballRef.current.position.y = y;
         }
         
         if (dist < 0.001) {
-            // Arrival
-            groupRef.current.position.copy(physics.targetWorld);
+            // Arrival - snap to exact target position
+            currentPos.copy(targetPos);
             this.movementSystem.onArrival();
             return true; // Movement completed
         } else {
-            // Continue moving
+            // Continue moving towards target
             const step = Math.min(dist, physics.currentSpeed * deltaTime);
             dir.normalize().multiplyScalar(step);
-            pos.add(dir);
+            currentPos.add(dir);
+            
+            // Update the store's world position to match current visual position
+            playerState.position.worldPosition.copy(currentPos);
         }
         
         return false; // Still moving

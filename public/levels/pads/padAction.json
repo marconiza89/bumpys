@@ -9,6 +9,8 @@
         "IdleBounce": "true",
         "BottomEntry": "false",
         "BottomExit": "false",
+        "TopEntry": "true",
+        "TopExit": "true",
         "BounceTopDamage": "false",
         "BounceBotDamage": "false",
         "LeftRebounce": "false",
@@ -34,7 +36,7 @@
         "green1": { "Consumable": "true", "ConsumableBounce": "1" },
         "green2": { "Consumable": "true", "ConsumableBounce": "2" },
         "toptrap": { "BounceTopDamage": "true"   },
-        "updoor": { "BottomEntry": "false"  },
-        "downdoor": { "BottomExit": "false" }
+        "updoor": { "BottomEntry": "true"  },
+        "downdoor": { "BottomExit": "true" }
     }
 }
