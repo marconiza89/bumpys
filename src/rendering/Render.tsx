@@ -21,7 +21,7 @@ export function Render() {
     useEffect(() => {
         let active = true;
         (async () => {
-            const res = await fetch("/levels/data/Levelref.json");
+            const res = await fetch("/levels/data/Level1.json");
             const data = (await res.json()) as LevelData;
             if (active) setLevel(data);
         })();
@@ -36,7 +36,7 @@ export function Render() {
             <Environment  preset="sunset" />
             <OrbitControls target={[0, 0, 0]} />
             <Sfondo /> 
-            <Model position={[0,-6.6,1.2]} scale={3} />
+            {/* <Model position={[0,-6.6,1.2]} scale={3} /> */}
             {/* <Bumpy /> */}
 
             {level && <Level data={level} />}
