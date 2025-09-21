@@ -4,11 +4,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Mesh, Vector3, PositionalAudio as ThreePositionalAudio } from "three";
 import { useFrame } from "@react-three/fiber";
 import { LevelData } from "../types/LevelTypes";
-import { coordToWorld, expandRows, parseCoord } from "../utils/Grid";
+import { coordToWorld, expandRows, parseCoord, cellsMap } from "../utils/Grid";
 import { publishPadEvent } from "@/levels/state/padEvents";
 import { useItemsStore } from "@/levels/state/itemsStore";
 import { PositionalAudio } from "@react-three/drei";
 import { Bumpy } from "./models/Bumpy";
+import { 
+    getEntryActionsForCell, 
+    getExitActionsForCell, 
+    initMovementRules,
+    hasIdleBounceAtCell,
+    getBouncerPropertiesForCell
+} from "../movementRules";
+import { 
+    resolveGravity, 
+    attemptMoveFrom,
+    stepJump,
+    attemptMoveNoGravity,
+    Direction 
+} from "../movementsLogic";
 
 type PlayerProps = {
     data: LevelData;
@@ -23,6 +37,11 @@ function toCoord(rows: string[], colStart: number, rowIndex: number, colIndex: n
 }
 
 export function Player({ data }: PlayerProps) {
+    // Initialize movement rules on mount
+    useEffect(() => {
+        initMovementRules().catch(console.error);
+    }, []);
+
     // Grid info
     const rows = useMemo(() => expandRows(data.meta.grid.rows), [data]);
     const [colStart, colEnd] = data.meta.grid.cols;
@@ -35,9 +54,9 @@ export function Player({ data }: PlayerProps) {
         active: boolean;
         start: Vector3;
         dir: -1 | 1;
-        total: number;     // lunghezza totale (andata+ritorno)
-        traveled: number;  // percorso cumulativo
-        impactPlayed: boolean; // NEW: suono impatto già eseguito?
+        total: number;
+        traveled: number;
+        impactPlayed: boolean;
     }>({
         active: false,
         start: new Vector3(),
@@ -47,10 +66,10 @@ export function Player({ data }: PlayerProps) {
         impactPlayed: false,
     });
 
-    // Pad lookup
+    // Pad lookup with movement rules
     const padMap = useMemo(() => {
         const m = new Map<string, boolean>();
-        for (const r of rows) for (let c = colStart; c <= colEnd; c++) m.set(`${r}${c}`.toUpperCase(), false); // FIX
+        for (const r of rows) for (let c = colStart; c <= colEnd; c++) m.set(`${r}${c}`.toUpperCase(), false);
         for (const c of data.cells) m.set(c.coord.toUpperCase(), c.pad !== "empty");
         return m;
     }, [data, rows, colStart, colEnd]);
@@ -83,28 +102,32 @@ export function Player({ data }: PlayerProps) {
 
         if (s === "descend") pendingSideRef.current = 0;
 
-        // NEW: memorizza da dove arriviamo quando entriamo in idle
         if (s === "idle") landedFromRef.current = prev;
         else landedFromRef.current = null;
 
         if (s === "ascend" || s === "descend") {
             pauseBounce();
         } else {
+            const coord = toCoord(rows, colStart, rowIndex, colIndex);
+            const hasIdleBounce = hasIdleBounceAtCell(data, coord);
+            
             const suppressResume =
                 (prev === "descend" && (inputRef.current.up || inputRef.current.left || inputRef.current.right)) ||
                 (prev === "ascend" &&
                     (inputRef.current.left || inputRef.current.right || pendingSideRef.current !== 0));
-            if (!suppressResume) ensureBounceIfIdle();
+            if (!suppressResume && hasIdleBounce) ensureBounceIfIdle();
         }
     }
 
     // Input
     const inputRef = useRef({ left: false, right: false, up: false, down: false });
+    const inputBlockedRef = useRef(false); // Block input temporarily for bouncer pads
 
-    // Coda laterale in aria (non durante descend)
+    // Side queue when in air
     const pendingSideRef = useRef<0 | -1 | 1>(0);
     const queueSide = (dir: -1 | 1) => {
         if (vStateRef.current === "descend") return;
+        if (inputBlockedRef.current) return; // Don't queue if input is blocked
         if (pendingSideRef.current === 0) pendingSideRef.current = dir;
     };
 
@@ -122,7 +145,6 @@ export function Player({ data }: PlayerProps) {
             }
             if (e.key === "ArrowUp" || e.key === "w") {
                 inputRef.current.up = true;
-                // Non permettere di tornare in ascend durante "descend"
             }
             if (e.key === "ArrowDown" || e.key === "s") {
                 inputRef.current.down = true;
@@ -143,32 +165,29 @@ export function Player({ data }: PlayerProps) {
         };
     }, []);
 
-    // Movimento gruppo
+    // Group movement
     const groupRef = useRef<Group>(null);
     const targetWorld = useRef<Vector3>(new Vector3());
     const movingRef = useRef(false);
 
-    // Dati movimento
+    // Movement data
     const moveKindRef = useRef<"none" | "side" | "vertical">("none");
     const moveInitialDistRef = useRef(1);
     const currentSpeedRef = useRef(1);
 
-    // Palla e rimbalzo
+    // Ball and bounce
     const ballRef = useRef<Mesh>(null);
     const wallAudioRef = useRef<ThreePositionalAudio | null>(null);
     const BOUNCE_BPM = 140;
-    const BOUNCE_FREQ = BOUNCE_BPM / 60; // Hz
+    const BOUNCE_FREQ = BOUNCE_BPM / 60;
     const TWO_PI = Math.PI * 2;
 
     const BALL_MIN_Y = 0.3;
     const BALL_MAX_Y = 0.8;
-    const BALL_MID_Y = (BALL_MIN_Y + BALL_MAX_Y) / 2; // 0.55
-    const BALL_AMP_Y = (BALL_MAX_Y - BALL_MIN_Y) / 2; // 0.25
+    const BALL_MID_Y = (BALL_MIN_Y + BALL_MAX_Y) / 2;
+    const BALL_AMP_Y = (BALL_MAX_Y - BALL_MIN_Y) / 2;
 
-    // Durata laterale fissa e indipendente (richiesta)
     const SIDE_MOVE_DURATION_SEC = 0.38;
-
-    // Velocità verticale indipendente
     const DEFAULT_STEP_DURATION = 0.14;
     const verticalSpeed = tileSize / DEFAULT_STEP_DURATION;
 
@@ -178,26 +197,27 @@ export function Player({ data }: PlayerProps) {
     const prevPRef = useRef(0);
     const queuedGroundActionRef = useRef<undefined | (() => void)>(undefined);
 
-
     function startBounce() {
         if (bounceActiveRef.current) return;
         hasStartedBounceRef.current = true;
         bounceActiveRef.current = true;
-        const y0 = 0.5; // start a metà
+        const y0 = 0.5;
         const cosVal = Math.max(-1, Math.min(1, (y0 - BALL_MID_Y) / BALL_AMP_Y));
         const base = Math.acos(cosVal) / TWO_PI;
-        const p0Up = 1 - base; // partire salendo
+        const p0Up = 1 - base;
         bouncePRef.current = p0Up;
         prevPRef.current = p0Up;
         if (ballRef.current) ballRef.current.position.y = y0;
     }
+    
     function pauseBounce() {
         bounceActiveRef.current = false;
     }
+    
     function resumeBounceFromGround() {
         if (!hasStartedBounceRef.current) return;
         bounceActiveRef.current = true;
-        const p = 0.5001; // subito dopo il touch a terra
+        const p = 0.5001;
         bouncePRef.current = p;
         prevPRef.current = p;
         if (ballRef.current) {
@@ -205,6 +225,7 @@ export function Player({ data }: PlayerProps) {
             ballRef.current.position.y = y;
         }
     }
+    
     function ensureBounceIfIdle() {
         if (vStateRef.current !== "idle") return;
         if (movingRef.current) return;
@@ -212,16 +233,12 @@ export function Player({ data }: PlayerProps) {
         if (!bounceActiveRef.current) resumeBounceFromGround();
     }
 
-
-
     function queueGroundAction(action: () => void) {
         if (!bounceActiveRef.current) startBounce();
         queuedGroundActionRef.current = action;
     }
 
     function onBounceGround() {
-        // Pubblica il bounce sul pad corrente quando il rimbalzo tocca terra in idle
-        // (è qui che i comandi accodati scatteranno)
         const coord = toCoord(rows, colStart, rowIndex, colIndex);
         publishPadEvent(coord, "bounce");
 
@@ -246,7 +263,6 @@ export function Player({ data }: PlayerProps) {
         if (groupRef.current) groupRef.current.position.copy(start);
         setVState(isPadAt(rowIndex, colIndex) ? "idle" : "descend");
 
-        // raccogli subito se spawni su un item
         const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
         useItemsStore.getState().collectAt(spawnCoord);
 
@@ -254,7 +270,7 @@ export function Player({ data }: PlayerProps) {
     }, []);
 
     useFrame((_, dt) => {
-        // Rimbalzo solo da idle e non durante balzi
+        // Bounce animation only in idle
         if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.current && moveKindRef.current !== "side" && ballRef.current) {
             const prev = bouncePRef.current;
             const p = (prev + BOUNCE_FREQ * dt) % 1;
@@ -273,7 +289,7 @@ export function Player({ data }: PlayerProps) {
             prevPRef.current = p;
         }
 
-        // Movimento tra celle
+        // Movement between cells
         if (!groupRef.current) return;
 
         if (wallBounceRef.current.active && groupRef.current) {
@@ -282,7 +298,7 @@ export function Player({ data }: PlayerProps) {
             const step = currentSpeedRef.current * dt;
             wb.traveled = Math.min(wb.traveled + step, wb.total);
 
-            const progress = wb.traveled / wb.total; // 0..1
+            const progress = wb.traveled / wb.total;
             const half = wb.total / 2;
 
             const distOut = progress <= 0.5 ? progress * wb.total : (1 - progress) * wb.total;
@@ -296,7 +312,6 @@ export function Player({ data }: PlayerProps) {
                 ballRef.current.position.y = y;
             }
 
-            // Impatto contro il muro: play a metà percorso (punto di inversione)
             if (!wb.impactPlayed && wb.traveled >= half - 1e-6) {
                 wb.impactPlayed = true;
                 const a = wallAudioRef.current;
@@ -324,14 +339,11 @@ export function Player({ data }: PlayerProps) {
             }
         }
 
-
-
         if (movingRef.current) {
             const pos = groupRef.current.position;
             const dir = targetWorld.current.clone().sub(pos);
             const dist = dir.length();
 
-            // Profilo ad arco del balzo laterale (sempre, sia su pad che in aria)
             if (moveKindRef.current === "side" && ballRef.current) {
                 const t = 1 - Math.max(0, Math.min(1, dist / Math.max(1e-6, moveInitialDistRef.current)));
                 const y = BALL_MIN_Y + (BALL_MAX_Y - BALL_MIN_Y) * Math.sin(Math.PI * t);
@@ -353,7 +365,6 @@ export function Player({ data }: PlayerProps) {
     });
 
     function setGridAndMove(toRow: number, toCol: number, onDone?: () => void) {
-        // Clamp
         toRow = Math.max(0, Math.min(rowsCount - 1, toRow));
         toCol = Math.max(0, Math.min(colsCount - 1, toCol));
 
@@ -363,13 +374,11 @@ export function Player({ data }: PlayerProps) {
         const tw = computeWorld(toRow, toCol);
         targetWorld.current.copy(tw);
 
-        // Distanza iniziale e velocità per questo movimento
         let dist = tileSize;
         if (groupRef.current) dist = groupRef.current.position.distanceTo(tw);
         moveInitialDistRef.current = dist;
 
         if (moveKindRef.current === "side") {
-            // Durata laterale fissa (0.25s a cella)
             const duration = SIDE_MOVE_DURATION_SEC;
             currentSpeedRef.current = dist / duration;
             pauseBounce();
@@ -384,6 +393,79 @@ export function Player({ data }: PlayerProps) {
 
     const arrivalCallbackRef = useRef<undefined | (() => void)>(undefined);
 
+    function handleBouncerPad(padType: string, coord: string) {
+        // Block input to prevent override
+        inputBlockedRef.current = true;
+        pendingSideRef.current = 0; // Clear any pending side movement
+        
+        // Get bouncer properties from movement rules
+        const cellMap = cellsMap(data);
+        const cell = cellMap.get(coord.toUpperCase());
+        const pad = cell?.pad ?? data.defaults.pad;
+        
+        let bounceDir: -1 | 1 = 0;
+        let bounceStrength = 1;
+        
+        // Determine bounce based on pad type
+        if (pad === "rbouncer") {
+            bounceDir = 1; // Right bouncer bounces left
+            bounceStrength = 1; // From config: RightRebounceStrong: 1
+        } else if (pad === "lbouncer") {
+            bounceDir = -1; // Left bouncer bounces right  
+            bounceStrength = 1; // From config: LeftRebounceStrong: 1
+        } else if (pad === "rtrampoline") {
+            bounceDir = -1; // Right trampoline bounces left
+            bounceStrength = 2; // From config: RightRebounceStrong: 2
+        } else if (pad === "ltrampoline") {
+            bounceDir = 1; // Left trampoline bounces right
+            bounceStrength = 2; // From config: LeftRebounceStrong: 2
+        }
+        
+        if (bounceDir === 0) {
+            inputBlockedRef.current = false;
+            return;
+        }
+        
+        // Calculate target position based on strength
+        let targetCol = colIndex;
+        let cellsToMove = bounceStrength;
+        
+        // Find the furthest valid position we can bounce to
+        for (let i = 1; i <= bounceStrength; i++) {
+            const testCol = colIndex + (bounceDir * i);
+            if (canMoveTo(rowIndex, testCol)) {
+                targetCol = testCol;
+                cellsToMove = i;
+            } else {
+                break; // Hit boundary
+            }
+        }
+        
+        if (targetCol !== colIndex) {
+            // Perform the bounce
+            moveKindRef.current = "side";
+            setGridAndMove(rowIndex, targetCol, () => {
+                const bouncedToPad = isPadAt(rowIndex, targetCol);
+                if (bouncedToPad) {
+                    setVState("idle");
+                } else {
+                    setVState("descend");
+                }
+                // Re-enable input after bounce completes
+                setTimeout(() => {
+                    inputBlockedRef.current = false;
+                }, 100);
+            });
+        } else {
+            // Can't bounce - hit wall immediately
+            performWallBounce(bounceDir);
+            // Re-enable input after wall bounce
+            setTimeout(() => {
+                inputBlockedRef.current = false;
+            }, 300);
+        }
+    }
+
     function onArrived() {
         const cb = arrivalCallbackRef.current;
         arrivalCallbackRef.current = undefined;
@@ -393,11 +475,26 @@ export function Player({ data }: PlayerProps) {
             if (ballRef.current) ballRef.current.position.y = BALL_MIN_Y;
         }
 
-        // raccogli item nella nuova cella
         const here = toCoord(rows, colStart, rowIndex, colIndex);
         useItemsStore.getState().collectAt(here);
 
-        // NEW: pubblica sempre il touch a terra, ma riprendi il bounce solo se non c'è azione immediata
+        // Check if we landed on a bouncer pad
+        const cellMap = cellsMap(data);
+        const cell = cellMap.get(here.toUpperCase());
+        const padType = cell?.pad ?? data.defaults.pad;
+        
+        if (vStateRef.current === "idle" && 
+            (padType === "rbouncer" || padType === "lbouncer" || 
+             padType === "rtrampoline" || padType === "ltrampoline")) {
+            
+            // Immediately handle the bouncer, don't wait
+            publishPadEvent(here, "bounce");
+            handleBouncerPad(padType, here);
+            
+            // Don't resume normal bounce while being bounced
+            return;
+        }
+
         if (vStateRef.current === "idle") {
             onBounceGround();
             const suppressResume =
@@ -413,7 +510,6 @@ export function Player({ data }: PlayerProps) {
         moveKindRef.current = "none";
     }
 
-
     function performWallBounce(dir: -1 | 1) {
         if (!groupRef.current || movingRef.current) return;
 
@@ -428,7 +524,7 @@ export function Player({ data }: PlayerProps) {
         wallBounceRef.current.dir = dir;
         wallBounceRef.current.total = totalLength;
         wallBounceRef.current.traveled = 0;
-        wallBounceRef.current.impactPlayed = false; // reset
+        wallBounceRef.current.impactPlayed = false;
 
         moveKindRef.current = "side";
         currentSpeedRef.current = totalLength / SIDE_MOVE_DURATION_SEC;
@@ -441,81 +537,156 @@ export function Player({ data }: PlayerProps) {
     function canMoveTo(r: number, c: number) {
         return !(r < 0 || r >= rowsCount || c < 0 || c >= colsCount);
     }
-    const canMoveSide = (dir: -1 | 1) => canMoveTo(rowIndex, colIndex + dir);
+
+    function canMoveSide(dir: -1 | 1): boolean {
+        const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
+        const toCol = colIndex + dir;
+        
+        if (!canMoveTo(rowIndex, toCol)) return false;
+        
+        const targetCoord = toCoord(rows, colStart, rowIndex, toCol);
+        const exitRules = getExitActionsForCell(data, fromCoord);
+        const entryRules = getEntryActionsForCell(data, targetCoord);
+        
+        if (dir === 1) {
+            return exitRules.toRight && entryRules.fromLeft;
+        } else {
+            return exitRules.toLeft && entryRules.fromRight;
+        }
+    }
 
     function tryMoveSide(dir: -1 | 1) {
         if (movingRef.current) return;
-        if (vStateRef.current === "descend") return; // nessun laterale in caduta
+        if (vStateRef.current === "descend") return;
 
         const toCol = colIndex + dir;
         if (!canMoveTo(rowIndex, toCol)) {
-            // Effetto muro: unico balzo continuo, metà blocco e ritorno
             performWallBounce(dir);
             return;
         }
 
-        // Sempre balzo laterale, sia su pad (idle) che in aria (ascend)
-        moveKindRef.current = "side";
+        // Check movement rules
+        const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
+        const targetCoord = toCoord(rows, colStart, rowIndex, toCol);
+        
+        // Check exit and entry rules
+        const exitRules = getExitActionsForCell(data, fromCoord);
+        const entryRules = getEntryActionsForCell(data, targetCoord);
+        
+        const canExit = dir === 1 ? exitRules.toRight : exitRules.toLeft;
+        const canEnter = dir === 1 ? entryRules.fromLeft : entryRules.fromRight;
+        
+        if (!canExit || !canEnter) {
+            // Movement blocked by rules
+            performWallBounce(dir);
+            return;
+        }
 
+        moveKindRef.current = "side";
         const fromState = vStateRef.current;
-        setGridAndMove(rowIndex, toCol, () => {
-            const hasPadHere = isPadAt(rowIndex, toCol);
-            if (fromState === "ascend") {
-                if (hasPadHere) setVState("idle");
-                else setVState("ascend");
-            } else {
-                if (hasPadHere) setVState("idle");
-                else setVState("descend");
-            }
-        });
+
+        // If we're in ascend state, maintain the jump arc
+        if (fromState === "ascend") {
+            // Move laterally during jump
+            setGridAndMove(rowIndex, toCol, () => {
+                const hasPadHere = isPadAt(rowIndex, toCol);
+                const currentPadEmpty = !isPadAt(rowIndex, colIndex);
+                
+                if (hasPadHere) {
+                    // Landing on a solid pad
+                    const landingRules = getEntryActionsForCell(data, targetCoord);
+                    if (landingRules.fromTop) {
+                        setVState("idle");
+                    } else {
+                        // Can't land on this pad, continue jumping or fall
+                        if (currentPadEmpty) {
+                            // We were jumping from empty space, now fall
+                            setVState("descend");
+                        } else {
+                            setVState("ascend"); // Continue jumping
+                        }
+                    }
+                } else {
+                    // Moved to empty space during jump
+                    // If we were already on empty, we should fall
+                    // If we jumped from a solid pad, we can continue the arc for one move
+                    if (currentPadEmpty) {
+                        setVState("descend");
+                    } else {
+                        // Just moved from solid to empty, continue ascend for this move
+                        // But mark that next lateral move should trigger descent
+                        setVState("ascend");
+                    }
+                }
+            });
+        } else {
+            // From idle state - apply gravity after lateral movement
+            setGridAndMove(rowIndex, toCol, () => {
+                const hasPadHere = isPadAt(rowIndex, toCol);
+                if (hasPadHere) {
+                    setVState("idle");
+                } else {
+                    // Start falling after moving to empty space
+                    setVState("descend");
+                }
+            });
+        }
     }
 
     function tryAscend() {
         if (movingRef.current) return;
-        const upRow = rowIndex + 1;
-
-        if (!canMoveTo(upRow, colIndex) || isPadAt(upRow, colIndex)) {
+        
+        const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
+        const jumpResult = stepJump(data, fromCoord, {});
+        
+        if (!jumpResult.continue) {
             setVState("descend");
             return;
         }
 
+        // Parse the new coordinate
+        const { rowLetter: newRow, col: newCol } = parseCoord(jumpResult.coord);
+        const newRowIndex = rows.indexOf(newRow);
+        const newColIndex = newCol - colStart;
+
         moveKindRef.current = "vertical";
-        setGridAndMove(upRow, colIndex, () => {
-            if (vStateRef.current === "ascend") setVState("ascend");
+        setGridAndMove(newRowIndex, newColIndex, () => {
+            if (jumpResult.continue) {
+                setVState("ascend");
+            } else {
+                setVState(jumpResult.reason === "pad" ? "idle" : "descend");
+            }
         });
     }
 
     function tryDescend() {
         if (movingRef.current) return;
-        const downRow = rowIndex - 1;
-
-        if (!canMoveTo(downRow, colIndex)) {
+        
+        const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
+        const resultCoord = resolveGravity(data, fromCoord);
+        
+        if (resultCoord === fromCoord) {
+            // Already at the bottom or can't descend
             setVState("idle");
             return;
         }
 
-        const hasPadBelow = isPadAt(downRow, colIndex);
-        const hasPadHere = isPadAt(rowIndex, colIndex);
+        // Parse the result coordinate
+        const { rowLetter: newRow, col: newCol } = parseCoord(resultCoord);
+        const newRowIndex = rows.indexOf(newRow);
+        const newColIndex = newCol - colStart;
 
         moveKindRef.current = "vertical";
-
-        if (hasPadBelow) {
-            if (hasPadHere) {
-                setVState("idle");
-                return;
-            } else {
-                setGridAndMove(downRow, colIndex, () => setVState("idle"));
-                return;
-            }
-        }
-
-        setGridAndMove(downRow, colIndex);
+        setGridAndMove(newRowIndex, newColIndex, () => {
+            const hasPadHere = isPadAt(newRowIndex, newColIndex);
+            setVState(hasPadHere ? "idle" : "descend");
+        });
     }
 
     function resolveMotion() {
         const state = vStateRef.current;
 
-        // 1) Caduta
+        // 1) Fall
         if (state === "descend") {
             inputRef.current.left = false;
             inputRef.current.right = false;
@@ -524,7 +695,12 @@ export function Player({ data }: PlayerProps) {
             return;
         }
 
-        // 2) Eventuale side accodato (già esistente)
+        // Block input processing if bouncer is active
+        if (inputBlockedRef.current) {
+            return;
+        }
+
+        // 2) Pending side movement
         if (pendingSideRef.current !== 0) {
             const dir = pendingSideRef.current as -1 | 1;
             pendingSideRef.current = 0;
@@ -549,11 +725,10 @@ export function Player({ data }: PlayerProps) {
             return;
         }
 
-        // NEW 2.5) Azioni immediate al primo frame dopo l'atterraggio in idle
+        // 3) Immediate actions after landing in idle
         if (state === "idle" && landedFromRef.current) {
             const from = landedFromRef.current;
 
-            // Caso 1: arrivo da descend e su è premuto -> trampolino immediato
             if (from === "descend" && inputRef.current.up) {
                 inputRef.current.up = false;
                 const coord = toCoord(rows, colStart, rowIndex, colIndex);
@@ -564,11 +739,9 @@ export function Player({ data }: PlayerProps) {
                 return;
             }
 
-            // Caso 1.5: arrivo da descend e sinistra/destra premuto -> side immediato
             if (from === "descend" && (inputRef.current.left || inputRef.current.right)) {
                 const dir: -1 | 1 = inputRef.current.left ? -1 : 1;
 
-                // pulizia input per evitare doppie esecuzioni
                 if (dir === -1) inputRef.current.left = false;
                 if (dir === 1) inputRef.current.right = false;
                 pendingSideRef.current = 0;
@@ -580,7 +753,6 @@ export function Player({ data }: PlayerProps) {
                 return;
             }
 
-            // Caso 2: arrivo da ascend e sinistra/destra premuto -> side immediato
             if (
                 from === "ascend" &&
                 (inputRef.current.left || inputRef.current.right || pendingSideRef.current !== 0)
@@ -588,7 +760,6 @@ export function Player({ data }: PlayerProps) {
                 const dir: -1 | 1 =
                     inputRef.current.left ? -1 : inputRef.current.right ? 1 : (pendingSideRef.current as -1 | 1) || 1;
 
-                // pulizia input per evitare doppie esecuzioni
                 if (dir === -1) inputRef.current.left = false;
                 if (dir === 1) inputRef.current.right = false;
                 pendingSideRef.current = 0;
@@ -600,11 +771,10 @@ export function Player({ data }: PlayerProps) {
                 return;
             }
 
-            // nessuna azione immediata, reset flag
             landedFromRef.current = null;
         }
 
-        // 3) Laterale live (come prima)
+        // 4) Live lateral movement
         if (inputRef.current.left) {
             inputRef.current.left = false;
             if (state === "idle") {
@@ -632,7 +802,7 @@ export function Player({ data }: PlayerProps) {
             return;
         }
 
-        // 4) Verticale (come prima)
+        // 5) Vertical movement
         if (state === "ascend") {
             if (inputRef.current.down) {
                 inputRef.current.down = false;
@@ -643,7 +813,7 @@ export function Player({ data }: PlayerProps) {
             return;
         }
 
-        // 5) Idle: comandi accodati (come prima)
+        // 6) Idle: queued commands
         if (inputRef.current.down) {
             inputRef.current.down = false;
             queueGroundAction(() => setVState("descend"));
@@ -661,8 +831,6 @@ export function Player({ data }: PlayerProps) {
         }
     }
 
-
-
     return (
         <group ref={groupRef} name="Player">
             <PositionalAudio
@@ -671,10 +839,10 @@ export function Player({ data }: PlayerProps) {
                 distance={4}
                 loop={false}
                 autoplay={false}
-
             />
             <group ref={ballRef} position={[0, 0.5, -0.25]} castShadow>
                 <Bumpy />
+                <pointLight color="#ffffff" intensity={2.} position={[0,0,1]} distance={3} />
             </group>
 
             <mesh position={[0, 0.09, -0.25]} rotation={[-Math.PI / 2, 0, 0]}>

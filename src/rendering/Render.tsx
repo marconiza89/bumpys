@@ -21,7 +21,7 @@ export function Render() {
     useEffect(() => {
         let active = true;
         (async () => {
-            const res = await fetch("/levels/data/Level1.json");
+            const res = await fetch("/levels/data/Level2.json");
             const data = (await res.json()) as LevelData;
             if (active) setLevel(data);
         })();
@@ -32,8 +32,8 @@ export function Render() {
 
     return (
         <Canvas key={canvasKey} className="w-full h-full bg-black overflow-hidden" camera={{ position: [0, 0, 7], fov: 55 }}>
-            <ambientLight intensity={0.6} />
-            <Environment  preset="sunset" />
+            <ambientLight intensity={0.} />
+             <Environment  preset="sunset" environmentIntensity={0.9} />
             <OrbitControls target={[0, 0, 0]} />
             <Sfondo /> 
             {/* <Model position={[0,-6.6,1.2]} scale={3} /> */}

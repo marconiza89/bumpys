@@ -22,9 +22,9 @@
     { "coord": "D1", "pad": "normal", "item": "none" },
     { "coord": "D2", "pad": "normal", "item": "none" },
     { "coord": "D3", "pad": "updoor", "item": "none" },
-    { "coord": "D4", "pad": "rtrampoline", "item": "none", "brick": "ldoor" },
+    { "coord": "D4", "pad": "rtrampoline", "item": "none", "brick": "rdoor" },
     { "coord": "D5", "pad": "ltrampoline", "item": "none" },
-    { "coord": "D6", "pad": "downdoor", "item": "none", "brick": "rdoor" },
+    { "coord": "D6", "pad": "downdoor", "item": "none", "brick": "ldoor" },
     { "coord": "D7", "pad": "normal", "item": "none" },
     { "coord": "D8", "pad": "normal", "item": "none" },
 

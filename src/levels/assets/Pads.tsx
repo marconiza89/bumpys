@@ -146,6 +146,7 @@ export function BasicPad({ position = [0, 0, 0], coord }: PadsProps) {
       <group ref={tiltNodeRef}>
         <group ref={springPivotRef} position={[0, 0, -halfDepth]}>
           <group position={[0, 0, halfDepth]}>
+            {/* <pointLight color="#ffffff" intensity={4.6} distance={3} position={[0, 0, 1]} /> */}
             <mesh receiveShadow>
               <RoundedBox args={[0.8, 0.15, 0.5]} radius={0.05} smoothness={4}>
                 <meshStandardMaterial color="#853448" />
@@ -187,7 +188,7 @@ export function RBouncer({ position = [0, 0, 0], coord }: PadsProps) {
   const material = new THREE.MeshStandardMaterial({ color: "#aa7a3b", metalness: 0.1, roughness: 0.0, emissive: "#e9955c", emissiveIntensity: 5.6 });
   return (
     <group position={position}>
-      <group position={[0, 0.2, 0]} rotation={[0, 0, -0.4]} >
+      <group position={[0, 0., 0]} rotation={[0, 0, -0.4]} >
         <mesh  >
           <RoundedBox args={[0.8, 0.25, 0.5]} radius={0.05} smoothness={4}>
             <meshStandardMaterial color="#853448" />
@@ -207,7 +208,7 @@ export function LBouncer({ position = [0, 0, 0], coord }: PadsProps) {
   const material = new THREE.MeshStandardMaterial({ color: "#aa7a3b", metalness: 0.1, roughness: 0.0, emissive: "#e9955c", emissiveIntensity: 5.6 });
   return (
     <group position={position}>
-      <group position={[0, 0.2, 0]} rotation={[0, 0, 0.4]} >
+      <group position={[0, 0, 0]} rotation={[0, 0, 0.4]} >
         <mesh  >
           <RoundedBox args={[0.8, 0.25, 0.5]} radius={0.05} smoothness={4}>
             <meshStandardMaterial color="#853448" />

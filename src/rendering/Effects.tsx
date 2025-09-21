@@ -42,7 +42,7 @@ export function Effects() {
         
           <EffectComposer multisampling={0}  >
               {/* <GodRays sun={material} weight={10} density={1.2} samples={64} exposure={0.034} decay={0.9} blur={true} /> */}
-              <Pixelation granularity={0.5} />
+              <Pixelation granularity={4.5} />
             {/* <BrightnessContrast brightness={0.02} contrast={0.} />  */}
             {/* <FXAA />                     */}
             <Bloom mipmapBlur luminanceThreshold={0.1} intensity={0.3} />  
