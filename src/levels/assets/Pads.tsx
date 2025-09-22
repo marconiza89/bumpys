@@ -128,7 +128,7 @@ export function BasicPad({ position = [0, 0, 0], coord }: PadsProps) {
       {/* Bounce  */}
       <PositionalAudio
         ref={audioRef}
-        url="/sounds/basicBounce.WAV"
+        url="/sounds/basicBounce.wav"
         distance={3}
         loop={false}
         autoplay={false}
@@ -185,40 +185,230 @@ export function DoubleTrapPad({ position = [0, 0, 0], coord }: PadsProps) {
 
 export function RBouncer({ position = [0, 0, 0], coord }: PadsProps) {
   const geometry = new THREE.SphereGeometry(0.05, 8, 8);
-  const material = new THREE.MeshStandardMaterial({ color: "#aa7a3b", metalness: 0.1, roughness: 0.0, emissive: "#e9955c", emissiveIntensity: 5.6 });
+  
+  // Riferimenti ai materiali delle sfere per animare l'emissive
+  const materialRefs = useRef<THREE.MeshStandardMaterial[]>([]);
+  const audioRef = useRef<ThreePositionalAudio>(null);
+  
+  // Stato animazione emissive
+  const boostTimer = useRef(0); // timer per il boost temporaneo
+  
+  const BASE_INTENSITY = 25.6;
+  const BOOST_MULTIPLIER = 4.0; // 4x quando c'è il bounce
+  const BOOST_DURATION = 0.33; // 1/3 di secondo
+
+  // Crea 3 materiali separati per poterli animare
+  const materials = useRef([
+    new THREE.MeshStandardMaterial({ 
+      color: "#aa7a3b", 
+      metalness: 0.1, 
+      roughness: 0.0, 
+      emissive: "#e9955c", 
+      emissiveIntensity: BASE_INTENSITY 
+    }),
+    new THREE.MeshStandardMaterial({ 
+      color: "#aa7a3b", 
+      metalness: 0.1, 
+      roughness: 0.0, 
+      emissive: "#e9955c", 
+      emissiveIntensity: BASE_INTENSITY 
+    }),
+    new THREE.MeshStandardMaterial({ 
+      color: "#aa7a3b", 
+      metalness: 0.1, 
+      roughness: 0.0, 
+      emissive: "#e9955c", 
+      emissiveIntensity: BASE_INTENSITY 
+    })
+  ]);
+
+  useEffect(() => {
+    materialRefs.current = materials.current;
+    return () => {
+      // Cleanup materials
+      materials.current.forEach(mat => mat.dispose());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!coord) return;
+    const unsubscribe = subscribePadEvents(coord, (e: PadEvent) => {
+      if (e.type === "bounce") {
+        // Attiva il boost temporaneo
+        boostTimer.current = BOOST_DURATION;
+
+        // Play audio (usando l'audio esistente del wall bounce)
+        const a = audioRef.current;
+        if (a) {
+          try {
+            a.setPlaybackRate(0.95 + Math.random() * 0.1);
+            if (a.isPlaying) a.stop();
+            if (a.context.state === "suspended") a.context.resume();
+            a.play();
+          } catch { }
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [coord]);
+
+  useFrame((state, dt) => {
+    // Decrementa il boost timer
+    if (boostTimer.current > 0) {
+      boostTimer.current = Math.max(0, boostTimer.current - dt);
+    }
+    
+    // Calcola il moltiplicatore corrente (1x normale, 4x durante boost)
+    const currentMultiplier = boostTimer.current > 0 ? BOOST_MULTIPLIER : 1.0;
+    
+    // Animazione continua pulsante con boost applicato
+    const time = state.clock.getElapsedTime();
+    
+    materialRefs.current.forEach((mat, i) => {
+      if (mat) {
+        // Pulsazione continua con offset per ogni sfera
+        const pulse = Math.sin(time * 3 + i * 2) * 0.3 + 0.7; // varia tra 0.4 e 1.0
+        mat.emissiveIntensity = BASE_INTENSITY * pulse * currentMultiplier;
+      }
+    });
+  });
+
   return (
     <group position={position}>
+      {/* Audio del bounce */}
+      <PositionalAudio
+        ref={audioRef}
+        url="/sounds/wall.wav"
+        distance={3}
+        loop={false}
+        autoplay={false}
+      />
+      
       <group position={[0, 0., 0]} rotation={[0, 0, -0.4]} >
-        <mesh  >
+        <mesh>
           <RoundedBox args={[0.8, 0.25, 0.5]} radius={0.05} smoothness={4}>
             <meshStandardMaterial color="#853448" />
           </RoundedBox>
         </mesh>
-        <mesh position={[-0.25, 0, 0.25]} geometry={geometry} material={material} />
-        <mesh position={[-0., 0, 0.25]} geometry={geometry} material={material} />
-        <mesh position={[0.25, 0, 0.25]} geometry={geometry} material={material} />
+        <mesh position={[-0.25, 0, 0.25]} geometry={geometry} material={materials.current[0]} />
+        <mesh position={[-0., 0, 0.25]} geometry={geometry} material={materials.current[1]} />
+        <mesh position={[0.25, 0, 0.25]} geometry={geometry} material={materials.current[2]} />
       </group>
-
     </group>
   );
 }
 
 export function LBouncer({ position = [0, 0, 0], coord }: PadsProps) {
   const geometry = new THREE.SphereGeometry(0.05, 8, 8);
-  const material = new THREE.MeshStandardMaterial({ color: "#aa7a3b", metalness: 0.1, roughness: 0.0, emissive: "#e9955c", emissiveIntensity: 5.6 });
+  
+  // Riferimenti ai materiali delle sfere per animare l'emissive
+  const materialRefs = useRef<THREE.MeshStandardMaterial[]>([]);
+  const audioRef = useRef<ThreePositionalAudio>(null);
+  
+  // Stato animazione emissive
+  const boostTimer = useRef(0); // timer per il boost temporaneo
+  
+  const BASE_INTENSITY = 25.6;
+  const BOOST_MULTIPLIER = 4.0; // 4x quando c'è il bounce
+  const BOOST_DURATION = 0.33; // 1/3 di secondo
+
+  // Crea 3 materiali separati per poterli animare
+  const materials = useRef([
+    new THREE.MeshStandardMaterial({ 
+      color: "#aa7a3b", 
+      metalness: 0.1, 
+      roughness: 0.0, 
+      emissive: "#e9955c", 
+      emissiveIntensity: BASE_INTENSITY 
+    }),
+    new THREE.MeshStandardMaterial({ 
+      color: "#aa7a3b", 
+      metalness: 0.1, 
+      roughness: 0.0, 
+      emissive: "#e9955c", 
+      emissiveIntensity: BASE_INTENSITY 
+    }),
+    new THREE.MeshStandardMaterial({ 
+      color: "#aa7a3b", 
+      metalness: 0.1, 
+      roughness: 0.0, 
+      emissive: "#e9955c", 
+      emissiveIntensity: BASE_INTENSITY 
+    })
+  ]);
+
+  useEffect(() => {
+    materialRefs.current = materials.current;
+    return () => {
+      // Cleanup materials
+      materials.current.forEach(mat => mat.dispose());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!coord) return;
+    const unsubscribe = subscribePadEvents(coord, (e: PadEvent) => {
+      if (e.type === "bounce") {
+        // Attiva il boost temporaneo
+        boostTimer.current = BOOST_DURATION;
+
+        // Play audio (usando l'audio esistente del wall bounce)
+        const a = audioRef.current;
+        if (a) {
+          try {
+            a.setPlaybackRate(0.95 + Math.random() * 0.1);
+            if (a.isPlaying) a.stop();
+            if (a.context.state === "suspended") a.context.resume();
+            a.play();
+          } catch { }
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [coord]);
+
+  useFrame((state, dt) => {
+    // Decrementa il boost timer
+    if (boostTimer.current > 0) {
+      boostTimer.current = Math.max(0, boostTimer.current - dt);
+    }
+    
+    // Calcola il moltiplicatore corrente (1x normale, 4x durante boost)
+    const currentMultiplier = boostTimer.current > 0 ? BOOST_MULTIPLIER : 1.0;
+    
+    // Animazione continua pulsante con boost applicato
+    const time = state.clock.getElapsedTime();
+    
+    materialRefs.current.forEach((mat, i) => {
+      if (mat) {
+        // Pulsazione continua con offset per ogni sfera
+        const pulse = Math.sin(time * 3 + i * 2) * 0.3 + 0.7; // varia tra 0.4 e 1.0
+        mat.emissiveIntensity = BASE_INTENSITY * pulse * currentMultiplier;
+      }
+    });
+  });
+
   return (
     <group position={position}>
+      {/* Audio del bounce */}
+      <PositionalAudio
+        ref={audioRef}
+        url="/sounds/wall.wav"
+        distance={3}
+        loop={false}
+        autoplay={false}
+      />
+      
       <group position={[0, 0, 0]} rotation={[0, 0, 0.4]} >
-        <mesh  >
+        <mesh>
           <RoundedBox args={[0.8, 0.25, 0.5]} radius={0.05} smoothness={4}>
             <meshStandardMaterial color="#853448" />
           </RoundedBox>
         </mesh>
-        <mesh position={[-0.25, 0, 0.25]} geometry={geometry} material={material} />
-        <mesh position={[-0., 0, 0.25]} geometry={geometry} material={material} />
-        <mesh position={[0.25, 0, 0.25]} geometry={geometry} material={material} />
+        <mesh position={[-0.25, 0, 0.25]} geometry={geometry} material={materials.current[0]} />
+        <mesh position={[-0., 0, 0.25]} geometry={geometry} material={materials.current[1]} />
+        <mesh position={[0.25, 0, 0.25]} geometry={geometry} material={materials.current[2]} />
       </group>
-
     </group>
   );
 }

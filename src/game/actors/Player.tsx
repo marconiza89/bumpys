@@ -9,19 +9,19 @@ import { publishPadEvent } from "@/levels/state/padEvents";
 import { useItemsStore } from "@/levels/state/itemsStore";
 import { PositionalAudio } from "@react-three/drei";
 import { Bumpy } from "./models/Bumpy";
-import { 
-    getEntryActionsForCell, 
-    getExitActionsForCell, 
+import {
+    getEntryActionsForCell,
+    getExitActionsForCell,
     initMovementRules,
     hasIdleBounceAtCell,
-    
+
 } from "../movementRules";
-import { 
-    resolveGravity, 
+import {
+    resolveGravity,
     attemptMoveFrom,
     stepJump,
     attemptMoveNoGravity,
-    Direction 
+    Direction
 } from "../movementsLogic";
 
 type PlayerProps = {
@@ -49,7 +49,7 @@ export function Player({ data }: PlayerProps) {
     const rowsCount = rows.length;
     const tileSize = data.meta.grid.tileSize ?? 1;
     const landedFromRef = useRef<VState | null>(null);
-    
+
     const wallBounceRef = useRef<{
         active: boolean;
         start: Vector3;
@@ -110,7 +110,7 @@ export function Player({ data }: PlayerProps) {
         } else {
             const coord = toCoord(rows, colStart, rowIndex, colIndex);
             const hasIdleBounce = hasIdleBounceAtCell(data, coord);
-            
+
             const suppressResume =
                 (prev === "descend" && (inputRef.current.up || inputRef.current.left || inputRef.current.right)) ||
                 (prev === "ascend" &&
@@ -209,11 +209,11 @@ export function Player({ data }: PlayerProps) {
         prevPRef.current = p0Up;
         if (ballRef.current) ballRef.current.position.y = y0;
     }
-    
+
     function pauseBounce() {
         bounceActiveRef.current = false;
     }
-    
+
     function resumeBounceFromGround() {
         if (!hasStartedBounceRef.current) return;
         bounceActiveRef.current = true;
@@ -225,7 +225,7 @@ export function Player({ data }: PlayerProps) {
             ballRef.current.position.y = y;
         }
     }
-    
+
     function ensureBounceIfIdle() {
         if (vStateRef.current !== "idle") return;
         if (movingRef.current) return;
@@ -397,15 +397,15 @@ export function Player({ data }: PlayerProps) {
         // Block input to prevent override
         inputBlockedRef.current = true;
         pendingSideRef.current = 0; // Clear any pending side movement
-        
+
         // Get bouncer properties from movement rules
         const cellMap = cellsMap(data);
         const cell = cellMap.get(coord.toUpperCase());
         const pad = cell?.pad ?? data.defaults.pad;
-        
+
         let bounceDir: -1 | 0 | 1 = 0;
         let bounceStrength = 1;
-        
+
         // Determine bounce based on pad type
         if (pad === "rbouncer") {
             bounceDir = 1; // Right bouncer bounces left
@@ -420,16 +420,16 @@ export function Player({ data }: PlayerProps) {
             bounceDir = 1; // Left trampoline bounces right
             bounceStrength = 2; // From config: LeftRebounceStrong: 2
         }
-        
+
         if (bounceDir === 0) {
             inputBlockedRef.current = false;
             return;
         }
-        
+
         // Calculate target position based on strength
         let targetCol = colIndex;
         let cellsToMove = bounceStrength;
-        
+
         // Find the furthest valid position we can bounce to
         for (let i = 1; i <= bounceStrength; i++) {
             const testCol = colIndex + (bounceDir * i);
@@ -440,7 +440,7 @@ export function Player({ data }: PlayerProps) {
                 break; // Hit boundary
             }
         }
-        
+
         if (targetCol !== colIndex) {
             // Perform the bounce
             moveKindRef.current = "side";
@@ -482,15 +482,15 @@ export function Player({ data }: PlayerProps) {
         const cellMap = cellsMap(data);
         const cell = cellMap.get(here.toUpperCase());
         const padType = cell?.pad ?? data.defaults.pad;
-        
-        if (vStateRef.current === "idle" && 
-            (padType === "rbouncer" || padType === "lbouncer" || 
-             padType === "rtrampoline" || padType === "ltrampoline")) {
-            
+
+        if (vStateRef.current === "idle" &&
+            (padType === "rbouncer" || padType === "lbouncer" ||
+                padType === "rtrampoline" || padType === "ltrampoline")) {
+
             // Immediately handle the bouncer, don't wait
             publishPadEvent(here, "bounce");
             handleBouncerPad(padType, here);
-            
+
             // Don't resume normal bounce while being bounced
             return;
         }
@@ -541,13 +541,13 @@ export function Player({ data }: PlayerProps) {
     function canMoveSide(dir: -1 | 1): boolean {
         const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
         const toCol = colIndex + dir;
-        
+
         if (!canMoveTo(rowIndex, toCol)) return false;
-        
+
         const targetCoord = toCoord(rows, colStart, rowIndex, toCol);
         const exitRules = getExitActionsForCell(data, fromCoord);
         const entryRules = getEntryActionsForCell(data, targetCoord);
-        
+
         if (dir === 1) {
             return exitRules.toRight && entryRules.fromLeft;
         } else {
@@ -568,14 +568,14 @@ export function Player({ data }: PlayerProps) {
         // Check movement rules
         const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
         const targetCoord = toCoord(rows, colStart, rowIndex, toCol);
-        
+
         // Check exit and entry rules
         const exitRules = getExitActionsForCell(data, fromCoord);
         const entryRules = getEntryActionsForCell(data, targetCoord);
-        
+
         const canExit = dir === 1 ? exitRules.toRight : exitRules.toLeft;
         const canEnter = dir === 1 ? entryRules.fromLeft : entryRules.fromRight;
-        
+
         if (!canExit || !canEnter) {
             // Movement blocked by rules
             performWallBounce(dir);
@@ -591,7 +591,7 @@ export function Player({ data }: PlayerProps) {
             setGridAndMove(rowIndex, toCol, () => {
                 const hasPadHere = isPadAt(rowIndex, toCol);
                 const currentPadEmpty = !isPadAt(rowIndex, colIndex);
-                
+
                 if (hasPadHere) {
                     // Landing on a solid pad
                     const landingRules = getEntryActionsForCell(data, targetCoord);
@@ -635,11 +635,30 @@ export function Player({ data }: PlayerProps) {
 
     function tryAscend() {
         if (movingRef.current) return;
-        
+
         const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
         const jumpResult = stepJump(data, fromCoord, {});
-        
+
         if (!jumpResult.continue) {
+            // Se abbiamo colpito un pad sopra, invia la "scossa" (stessa animazione del bounce)
+            let hitCoord: string | null = null;
+
+            if (jumpResult.reason === "pad") {
+                // stepJump ritorna la coord del pad colpito in jumpResult.coord
+                hitCoord = jumpResult.coord;
+            } else {
+                // Se il motivo è "blocked" (o altro), verifichiamo se sopra c'è comunque un pad
+                const upRow = rowIndex + 1;
+                if (upRow >= 0 && upRow < rows.length && isPadAt(upRow, colIndex)) {
+                    hitCoord = toCoord(rows, colStart, upRow, colIndex);
+                }
+            }
+
+            if (hitCoord) {
+                // Scossa sul pad colpito
+                publishPadEvent(hitCoord, "bounce");
+            }
+
             setVState("descend");
             return;
         }
@@ -661,10 +680,10 @@ export function Player({ data }: PlayerProps) {
 
     function tryDescend() {
         if (movingRef.current) return;
-        
+
         const fromCoord = toCoord(rows, colStart, rowIndex, colIndex);
         const resultCoord = resolveGravity(data, fromCoord);
-        
+
         if (resultCoord === fromCoord) {
             // Already at the bottom or can't descend
             setVState("idle");
@@ -842,7 +861,7 @@ export function Player({ data }: PlayerProps) {
             />
             <group ref={ballRef} position={[0, 0.5, -0.25]} castShadow>
                 <Bumpy />
-                <pointLight color="#ffffff" intensity={2.} position={[0,0,1]} distance={3} />
+                <pointLight color="#ffffff" intensity={2.} position={[0, 0, 1]} distance={3} />
             </group>
 
             <mesh position={[0, 0.09, -0.25]} rotation={[-Math.PI / 2, 0, 0]}>
