@@ -14,7 +14,7 @@ import {
     getExitActionsForCell, 
     initMovementRules,
     hasIdleBounceAtCell,
-    getBouncerPropertiesForCell
+    
 } from "../movementRules";
 import { 
     resolveGravity, 
@@ -403,7 +403,7 @@ export function Player({ data }: PlayerProps) {
         const cell = cellMap.get(coord.toUpperCase());
         const pad = cell?.pad ?? data.defaults.pad;
         
-        let bounceDir: -1 | 1 = 0;
+        let bounceDir: -1 | 0 | 1 = 0;
         let bounceStrength = 1;
         
         // Determine bounce based on pad type
