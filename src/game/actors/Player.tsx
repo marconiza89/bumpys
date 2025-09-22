@@ -66,6 +66,20 @@ export function Player({ data }: PlayerProps) {
         impactPlayed: false,
     });
 
+    const ceilingBounceRef = useRef<{
+        active: boolean;
+        start: Vector3;
+        total: number;
+        traveled: number;
+        impactPlayed: boolean;
+    }>({
+        active: false,
+        start: new Vector3(),
+        total: 0,
+        traveled: 0,
+        impactPlayed: false,
+    });
+
     // Pad lookup with movement rules
     const padMap = useMemo(() => {
         const m = new Map<string, boolean>();
@@ -339,6 +353,57 @@ export function Player({ data }: PlayerProps) {
             }
         }
 
+        if (ceilingBounceRef.current.active && groupRef.current) {
+            const vb = ceilingBounceRef.current;
+
+            const step = currentSpeedRef.current * dt;
+            vb.traveled = Math.min(vb.traveled + step, vb.total);
+
+            const progress = vb.traveled / vb.total;
+            const half = vb.total / 2;
+
+            // Offset verticale: va su fino a metà tile e torna giù
+            const distOut = progress <= 0.5 ? progress * vb.total : (1 - progress) * vb.total;
+            const offsetY = distOut;
+
+            const start = vb.start;
+            groupRef.current.position.set(start.x, start.y + offsetY, start.z);
+
+            // Arco della palla durante il bounce
+            if (ballRef.current) {
+                const y = BALL_MIN_Y + (BALL_MAX_Y - BALL_MIN_Y) * Math.sin(Math.PI * progress) /8;
+                ballRef.current.position.y = y;
+            }
+
+            // Suono d'impatto a metà corsa (punto di inversione)
+            if (!vb.impactPlayed && vb.traveled >= half - 1e-6) {
+                vb.impactPlayed = true;
+                const a = wallAudioRef.current;
+                if (a) {
+                    try {
+                        a.setPlaybackRate(0.95 + Math.random() * 0.1);
+                        if (a.isPlaying) a.stop();
+                        if (a.context.state === "suspended") a.context.resume();
+                        a.play();
+                    } catch { }
+                }
+            }
+
+            if (vb.traveled >= vb.total - 1e-6) {
+                vb.active = false;
+                movingRef.current = false;
+                moveKindRef.current = "none";
+                if (ballRef.current) ballRef.current.position.y = BALL_MIN_Y;
+
+                // Solo se siamo idle, riprendi il bounce “idle”
+                if (vStateRef.current === "idle") {
+                    onBounceGround();
+                    resumeBounceFromGround();
+                }
+                return;
+            }
+        }
+
         if (movingRef.current) {
             const pos = groupRef.current.position;
             const dir = targetWorld.current.clone().sub(pos);
@@ -414,10 +479,10 @@ export function Player({ data }: PlayerProps) {
             bounceDir = -1; // Left bouncer bounces right  
             bounceStrength = 1; // From config: LeftRebounceStrong: 1
         } else if (pad === "rtrampoline") {
-            bounceDir = -1; // Right trampoline bounces left
+            bounceDir = 1; // Right trampoline bounces left
             bounceStrength = 2; // From config: RightRebounceStrong: 2
         } else if (pad === "ltrampoline") {
-            bounceDir = 1; // Left trampoline bounces right
+            bounceDir = -1; // Left trampoline bounces right
             bounceStrength = 2; // From config: LeftRebounceStrong: 2
         }
 
@@ -534,6 +599,25 @@ export function Player({ data }: PlayerProps) {
         if (ballRef.current) ballRef.current.position.y = BALL_MIN_Y;
     }
 
+    function performCeilingBounce() {
+        if (!groupRef.current || movingRef.current) return;
+
+        const totalLength = tileSize;
+
+        ceilingBounceRef.current.active = true;
+        ceilingBounceRef.current.start.copy(groupRef.current.position);
+        ceilingBounceRef.current.total = totalLength;
+        ceilingBounceRef.current.traveled = 0;
+        ceilingBounceRef.current.impactPlayed = false;
+
+        moveKindRef.current = "vertical";
+        currentSpeedRef.current = totalLength / SIDE_MOVE_DURATION_SEC;
+
+        movingRef.current = true;
+        pauseBounce();
+        if (ballRef.current) ballRef.current.position.y = BALL_MIN_Y ;
+    }
+
     function canMoveTo(r: number, c: number) {
         return !(r < 0 || r >= rowsCount || c < 0 || c >= colsCount);
     }
@@ -640,14 +724,12 @@ export function Player({ data }: PlayerProps) {
         const jumpResult = stepJump(data, fromCoord, {});
 
         if (!jumpResult.continue) {
-            // Se abbiamo colpito un pad sopra, invia la "scossa" (stessa animazione del bounce)
+            // Se abbiamo colpito un pad sopra, invia la scossa al pad e fai il ceiling bounce
             let hitCoord: string | null = null;
 
             if (jumpResult.reason === "pad") {
-                // stepJump ritorna la coord del pad colpito in jumpResult.coord
                 hitCoord = jumpResult.coord;
-            } else {
-                // Se il motivo è "blocked" (o altro), verifichiamo se sopra c'è comunque un pad
+            } else if (jumpResult.reason === "blocked") {
                 const upRow = rowIndex + 1;
                 if (upRow >= 0 && upRow < rows.length && isPadAt(upRow, colIndex)) {
                     hitCoord = toCoord(rows, colStart, upRow, colIndex);
@@ -655,8 +737,8 @@ export function Player({ data }: PlayerProps) {
             }
 
             if (hitCoord) {
-                // Scossa sul pad colpito
                 publishPadEvent(hitCoord, "bounce");
+                performCeilingBounce();
             }
 
             setVState("descend");

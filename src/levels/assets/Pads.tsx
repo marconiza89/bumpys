@@ -278,7 +278,7 @@ export function RBouncer({ position = [0, 0, 0], coord }: PadsProps) {
       {/* Audio del bounce */}
       <PositionalAudio
         ref={audioRef}
-        url="/sounds/wall.wav"
+        url="/sounds/bouncer.wav"
         distance={3}
         loop={false}
         autoplay={false}
@@ -393,7 +393,7 @@ export function LBouncer({ position = [0, 0, 0], coord }: PadsProps) {
       {/* Audio del bounce */}
       <PositionalAudio
         ref={audioRef}
-        url="/sounds/wall.wav"
+        url="/sounds/bouncer.wav"
         distance={3}
         loop={false}
         autoplay={false}
