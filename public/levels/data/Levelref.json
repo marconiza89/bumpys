@@ -34,6 +34,9 @@
     { "coord": "E7", "pad": "toptrap", "item": "none" },
 
     { "coord": "F1", "pad": "normal", "item": "none" },
+    { "coord": "F2", "pad": "green2", "item": "none" },
+    { "coord": "F3", "pad": "green1", "item": "none" },
+    { "coord": "F4", "pad": "green1", "item": "none" },
     { "coord": "F5", "pad": "green1", "item": "none" },
     { "coord": "F6", "pad": "green1", "item": "none" },
     { "coord": "F7", "pad": "green1", "item": "none" },

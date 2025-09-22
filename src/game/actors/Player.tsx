@@ -23,6 +23,7 @@ import {
     attemptMoveNoGravity,
     Direction
 } from "../movementsLogic";
+import { useGreenPadsStore } from "@/levels/state/greenPadsStore";
 
 type PlayerProps = {
     data: LevelData;
@@ -88,12 +89,30 @@ export function Player({ data }: PlayerProps) {
         return m;
     }, [data, rows, colStart, colEnd]);
 
-    const isPadAt = (rowIndex: number, colIndex: number) => {
-        if (rowIndex < 0 || rowIndex >= rowsCount) return false;
-        if (colIndex < 0 || colIndex >= colsCount) return false;
-        const coord = toCoord(rows, colStart, rowIndex, colIndex);
-        return padMap.get(coord.toUpperCase()) === true;
-    };
+ const isPadAt = (rowIndex: number, colIndex: number) => {
+    if (rowIndex < 0 || rowIndex >= rowsCount) return false;
+    if (colIndex < 0 || colIndex >= colsCount) return false;
+    const coord = toCoord(rows, colStart, rowIndex, colIndex);
+    
+    // Check if the pad exists in the map
+    const hasPad = padMap.get(coord.toUpperCase()) === true;
+    
+    if (!hasPad) return false;
+    
+    // Check if it's a green pad that has been consumed
+    const cellMap = cellsMap(data);
+    const cell = cellMap.get(coord.toUpperCase());
+    const padType = cell?.pad ?? data.defaults.pad;
+    
+    if (padType === "green1" || padType === "green2") {
+        const greenPadStore = useGreenPadsStore.getState();
+        if (greenPadStore.isPadConsumed(coord)) {
+            return false; // Treat consumed green pad as empty
+        }
+    }
+    
+    return true;
+};
 
     // Spawn
     const { spawnRow, spawnCol } = useMemo(() => {
@@ -271,17 +290,20 @@ export function Player({ data }: PlayerProps) {
         return new Vector3(x, y, z);
     };
 
-    useEffect(() => {
-        const start = computeWorld(rowIndex, colIndex);
-        targetWorld.current.copy(start);
-        if (groupRef.current) groupRef.current.position.copy(start);
-        setVState(isPadAt(rowIndex, colIndex) ? "idle" : "descend");
+useEffect(() => {
+    const start = computeWorld(rowIndex, colIndex);
+    targetWorld.current.copy(start);
+    if (groupRef.current) groupRef.current.position.copy(start);
+    setVState(isPadAt(rowIndex, colIndex) ? "idle" : "descend");
 
-        const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
-        useItemsStore.getState().collectAt(spawnCoord);
+    const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
+    useItemsStore.getState().collectAt(spawnCoord);
+    
+    // Reset green pads for new level/restart
+    useGreenPadsStore.getState().reset();
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
     useFrame((_, dt) => {
         // Bounce animation only in idle

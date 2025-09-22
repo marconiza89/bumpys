@@ -168,6 +168,7 @@ gl_FragColor = vec4(c.rgb, alpha);
                     uniforms={uniforms}
                     vertexShader={vertexShader}
                     fragmentShader={fragmentShader}
+                    
                     transparent
                     depthWrite={false}
                 />

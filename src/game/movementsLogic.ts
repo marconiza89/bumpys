@@ -1,6 +1,7 @@
 import { LevelData } from "@/game/types/LevelTypes";
 import { cellsMap, expandRows, parseCoord } from "@/game/utils/Grid";
 import { getEntryActionsForCell, getExitActionsForCell } from "@/game/movementRules";
+import { useGreenPadsStore } from "@/levels/state/greenPadsStore";
 
 export type Direction = "left" | "right" | "up" | "down";
 
@@ -46,7 +47,20 @@ function getPadIdAtCoord(data: LevelData, coord: string): string {
 }
 
 function isPadEmptyAt(data: LevelData, coord: string): boolean {
-    return getPadIdAtCoord(data, coord) === "empty";
+    const padId = getPadIdAtCoord(data, coord);
+    
+    // Check if it's explicitly empty
+    if (padId === "empty") return true;
+    
+    // Check if it's a consumed green pad
+    if (padId === "green1" || padId === "green2") {
+        const greenPadStore = useGreenPadsStore.getState();
+        if (greenPadStore.isPadConsumed(coord)) {
+            return true; // Treat as empty if consumed
+        }
+    }
+    
+    return false;
 }
 
 // Scende finché la cella è empty; atterra alla prima non-empty che accetta ingresso dall’alto

@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { PadEvent, subscribePadEvents } from "@/levels/state/padEvents";
 import * as THREE from "three";
 import { Arrow, ArrowBlue } from "./Arrow";
+import { useGreenPadsStore } from "../state/greenPadsStore";
 
 export interface PadsProps {
   position?: [number, number, number];
@@ -15,6 +16,12 @@ export interface DynamicPadsProps {
   position?: [number, number, number];
   coord?: string;
   touchdown: number;
+}
+
+export interface GreenPadProps {
+    position?: [number, number, number];
+    coord?: string;
+    touchdown: number; // 1, 2 or 3
 }
 
 export function BasicPad({ position = [0, 0, 0], coord }: PadsProps) {
@@ -425,16 +432,171 @@ export function IcePad({ position = [0, 0, 0], coord }: PadsProps) {
   );
 }
 
-export function GreenPad({ position = [0, 0, 0], coord, touchdown = 0 }: DynamicPadsProps) {
-  return (
-    <group position={position}>
-      <mesh receiveShadow>
-        <RoundedBox args={[0.8 / 3 * touchdown, 0.15, 0.5]} radius={0.05} smoothness={4}>
-          <meshStandardMaterial color="#348546" />
-        </RoundedBox>
-      </mesh>
-    </group>
-  );
+export function GreenPad({ position = [0, 0, 0], coord, touchdown = 1 }: GreenPadProps) {
+    const groupRef = useRef<Group>(null);
+    const audioRef = useRef<ThreePositionalAudio>(null);
+    const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+    
+    // Animation state
+    const shrinkProgress = useRef(0);
+    const isShrinking = useRef(false);
+    const fadeProgress = useRef(0);
+    const isFading = useRef(false);
+    
+    // Get state from store
+    const remainingTouches = useGreenPadsStore((s) => 
+        coord ? s.getRemainingTouches(coord) : touchdown
+    );
+    const isConsumed = useGreenPadsStore((s) => 
+        coord ? s.isPadConsumed(coord) : false
+    );
+    
+    // Initialize the pad in the store on mount
+    useEffect(() => {
+        if (coord) {
+            useGreenPadsStore.getState().initPad(coord, touchdown);
+        }
+        
+        return () => {
+            // Cleanup if needed
+        };
+    }, [coord, touchdown]);
+    
+    // Subscribe to bounce events
+    useEffect(() => {
+        if (!coord) return;
+        
+        const unsubscribe = subscribePadEvents(coord, (e: PadEvent) => {
+            if (e.type === "bounce") {
+                const store = useGreenPadsStore.getState();
+                
+                // Only consume if not already consumed
+                if (!store.isPadConsumed(coord)) {
+                    const nowConsumed = store.consumeTouch(coord);
+                    
+                    // Trigger shrink animation
+                    if (!nowConsumed) {
+                        isShrinking.current = true;
+                        shrinkProgress.current = 0;
+                    } else {
+                        // Trigger fade animation when fully consumed
+                        isFading.current = true;
+                        fadeProgress.current = 0;
+                    }
+                    
+                    // Play consumption sound
+                    const a = audioRef.current;
+                    if (a) {
+                        try {
+                            // Different pitch based on remaining touches
+                            const pitch = 0.8 + (remainingTouches * 0.1);
+                            a.setPlaybackRate(pitch);
+                            if (a.isPlaying) a.stop();
+                            if (a.context.state === "suspended") a.context.resume();
+                            a.play();
+                        } catch { }
+                    }
+                }
+            }
+        });
+        
+        return () => unsubscribe();
+    }, [coord, remainingTouches]);
+    
+    // Animation loop
+    useFrame((_, dt) => {
+        // Shrink animation
+        if (isShrinking.current) {
+            shrinkProgress.current += dt * 3; // Speed of shrink
+            
+            if (shrinkProgress.current >= 1) {
+                shrinkProgress.current = 1;
+                isShrinking.current = false;
+            }
+            
+            // Apply easing
+            const easedProgress = 1 - Math.pow(1 - shrinkProgress.current, 3);
+            
+            if (groupRef.current) {
+                // Bounce effect during shrink
+                const bounce = Math.sin(easedProgress * Math.PI * 2) * 0.05;
+                groupRef.current.position.y = position[1] + bounce;
+            }
+        }
+        
+        // Fade animation when consumed
+        if (isFading.current) {
+            fadeProgress.current += dt * 2; // Speed of fade
+            
+            if (fadeProgress.current >= 1) {
+                fadeProgress.current = 1;
+                isFading.current = false;
+            }
+            
+            // Apply fade to material
+            if (materialRef.current) {
+                materialRef.current.opacity = 1 - fadeProgress.current;
+            }
+            
+            // Scale down as it fades
+            if (groupRef.current) {
+                const scale = 1 - (fadeProgress.current * 0.5);
+                groupRef.current.scale.setScalar(scale);
+            }
+        }
+    });
+    
+    // Calculate current width based on remaining touches
+    const baseWidth = 0.8;
+    const widthPerTouch = baseWidth / touchdown;
+    const currentWidth = widthPerTouch * remainingTouches;
+    
+    // Don't render if consumed
+    if (isConsumed) {
+        return null;
+    }
+    
+    // Color gets darker as touches are consumed
+    const greenIntensity = remainingTouches / touchdown;
+    const color = new THREE.Color().setHSL(0.33, 0.6, 0.3 + greenIntensity * 0.2);
+    
+    return (
+        <group ref={groupRef} position={position}>
+            {/* Consumption sound */}
+            <PositionalAudio
+                ref={audioRef}
+                url="/sounds/basicBounce.wav"
+                distance={3}
+                loop={false}
+                autoplay={false}
+            />
+            
+            <mesh receiveShadow>
+                <RoundedBox args={[currentWidth, 0.15, 0.5]} radius={0.05} smoothness={4}>
+                    <meshStandardMaterial 
+                        ref={materialRef}
+                        color={color}
+                        transparent
+                        opacity={1}
+                        emissive={color}
+                        emissiveIntensity={greenIntensity * 0.3}
+                    />
+                </RoundedBox>
+            </mesh>
+            
+            {/* Visual indicator of remaining touches */}
+            {Array.from({ length: remainingTouches }).map((_, i) => (
+                <mesh key={i} position={[(i - (remainingTouches - 1) / 2) * 0.15, 0.1, 0.2]}>
+                    <sphereGeometry args={[0.03, 8, 8]} />
+                    <meshStandardMaterial 
+                        color="#66ff66"
+                        emissive="#66ff66"
+                        emissiveIntensity={2}
+                    />
+                </mesh>
+            ))}
+        </group>
+    );
 }
 
 export function UpDoor({ position = [0, 0, 0] }: PadsProps) {
