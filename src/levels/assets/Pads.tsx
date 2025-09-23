@@ -1,5 +1,5 @@
 import { RoundedBox, PositionalAudio, useTexture } from "@react-three/drei";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Group, PositionalAudio as ThreePositionalAudio } from "three";
 import { useFrame } from "@react-three/fiber";
 import { PadEvent, subscribePadEvents } from "@/levels/state/padEvents";
@@ -432,56 +432,100 @@ export function IcePad({ position = [0, 0, 0], coord }: PadsProps) {
   );
 }
 
-export function GreenPad({ position = [0, 0, 0], coord, touchdown = 1 }: GreenPadProps) {
+export function GreenPad({ position = [0, 0, 0], coord = "", touchdown = 1 }: GreenPadProps) {
     const groupRef = useRef<Group>(null);
     const audioRef = useRef<ThreePositionalAudio>(null);
     const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+    const meshRef = useRef<THREE.Mesh>(null);
     
     // Animation state
-    const shrinkProgress = useRef(0);
-    const isShrinking = useRef(false);
-    const fadeProgress = useRef(0);
-    const isFading = useRef(false);
+    const [isAnimating, setIsAnimating] = useState(false);
+    const animationProgress = useRef(0);
+    const animationType = useRef<"shrink" | "fade" | "none">("none");
     
-    // Get state from store
-    const remainingTouches = useGreenPadsStore((s) => 
-        coord ? s.getRemainingTouches(coord) : touchdown
-    );
-    const isConsumed = useGreenPadsStore((s) => 
-        coord ? s.isPadConsumed(coord) : false
-    );
+    // Track initialization
+    const [isInitialized, setIsInitialized] = useState(false);
     
-    // Initialize the pad in the store on mount
-    useEffect(() => {
+    // Local state for rendering
+    const [localRemainingTouches, setLocalRemainingTouches] = useState(touchdown);
+    const [localConsumed, setLocalConsumed] = useState(false);
+    
+    // Initialize the pad in the store on mount and ensure proper initialization
+useEffect(() => {
         if (coord) {
-            useGreenPadsStore.getState().initPad(coord, touchdown);
+            const store = useGreenPadsStore.getState();
+            
+            // Initialize the pad (this will overwrite any existing state)
+            store.initPad(coord, touchdown);
+            
+            // Get the initial state from store after initialization
+            const remaining = store.getRemainingTouches(coord);
+            const consumed = store.isPadConsumed(coord);
+            
+            // Set local state
+            setLocalRemainingTouches(remaining > 0 ? remaining : touchdown);
+            setLocalConsumed(consumed);
+            setIsInitialized(true);
+            
+            console.log(`GreenPad ${coord}: Initialized with ${touchdown} touches, current state: ${remaining} remaining, consumed: ${consumed}`);
         }
         
         return () => {
-            // Cleanup if needed
+            // No cleanup - we want to persist the state
         };
     }, [coord, touchdown]);
     
+    // Subscribe to store changes after initialization
+    useEffect(() => {
+        if (!isInitialized || !coord) return;
+        
+        const unsubscribe = useGreenPadsStore.subscribe((state) => {
+            const remaining = state.getRemainingTouches(coord);
+            const consumed = state.isPadConsumed(coord);
+            
+            // Only update if there's a real change
+            if (remaining !== localRemainingTouches) {
+                setLocalRemainingTouches(remaining);
+            }
+            if (consumed !== localConsumed) {
+                setLocalConsumed(consumed);
+            }
+        });
+        
+        return unsubscribe;
+    }, [isInitialized, coord, localRemainingTouches, localConsumed]);
+    
     // Subscribe to bounce events
     useEffect(() => {
-        if (!coord) return;
+        if (!coord || !isInitialized) return;
         
         const unsubscribe = subscribePadEvents(coord, (e: PadEvent) => {
             if (e.type === "bounce") {
                 const store = useGreenPadsStore.getState();
                 
-                // Only consume if not already consumed
+                // Check current state
                 if (!store.isPadConsumed(coord)) {
+                    const remainingBefore = store.getRemainingTouches(coord);
                     const nowConsumed = store.consumeTouch(coord);
+                    const remainingAfter = store.getRemainingTouches(coord);
                     
-                    // Trigger shrink animation
-                    if (!nowConsumed) {
-                        isShrinking.current = true;
-                        shrinkProgress.current = 0;
-                    } else {
-                        // Trigger fade animation when fully consumed
-                        isFading.current = true;
-                        fadeProgress.current = 0;
+                    console.log(`GreenPad ${coord}: Bounce consumed touch. ${remainingBefore} -> ${remainingAfter}, consumed: ${nowConsumed}`);
+                    
+                    // Update local state immediately
+                    setLocalRemainingTouches(remainingAfter);
+                    setLocalConsumed(nowConsumed);
+                    
+                    // Trigger appropriate animation
+                    if (!nowConsumed && remainingAfter < remainingBefore) {
+                        // Pad was touched but not fully consumed - shrink animation
+                        animationType.current = "shrink";
+                        animationProgress.current = 0;
+                        setIsAnimating(true);
+                    } else if (nowConsumed) {
+                        // Pad is fully consumed - fade animation
+                        animationType.current = "fade";
+                        animationProgress.current = 0;
+                        setIsAnimating(true);
                     }
                     
                     // Play consumption sound
@@ -489,76 +533,83 @@ export function GreenPad({ position = [0, 0, 0], coord, touchdown = 1 }: GreenPa
                     if (a) {
                         try {
                             // Different pitch based on remaining touches
-                            const pitch = 0.8 + (remainingTouches * 0.1);
+                            const pitch = 0.8 + (remainingAfter * 0.1);
                             a.setPlaybackRate(pitch);
                             if (a.isPlaying) a.stop();
                             if (a.context.state === "suspended") a.context.resume();
                             a.play();
-                        } catch { }
+                        } catch (err) {
+                            console.error("Error playing audio:", err);
+                        }
                     }
+                } else {
+                    console.log(`GreenPad ${coord}: Already consumed, ignoring bounce`);
                 }
             }
         });
         
         return () => unsubscribe();
-    }, [coord, remainingTouches]);
+    }, [coord, isInitialized]);
     
     // Animation loop
     useFrame((_, dt) => {
-        // Shrink animation
-        if (isShrinking.current) {
-            shrinkProgress.current += dt * 3; // Speed of shrink
-            
-            if (shrinkProgress.current >= 1) {
-                shrinkProgress.current = 1;
-                isShrinking.current = false;
-            }
-            
-            // Apply easing
-            const easedProgress = 1 - Math.pow(1 - shrinkProgress.current, 3);
-            
-            if (groupRef.current) {
-                // Bounce effect during shrink
-                const bounce = Math.sin(easedProgress * Math.PI * 2) * 0.05;
-                groupRef.current.position.y = position[1] + bounce;
-            }
+        if (!isAnimating) return;
+        
+        animationProgress.current += dt * 3; // Speed of animation
+        
+        if (animationProgress.current >= 1) {
+            animationProgress.current = 1;
+            setIsAnimating(false);
+            animationType.current = "none";
         }
         
-        // Fade animation when consumed
-        if (isFading.current) {
-            fadeProgress.current += dt * 2; // Speed of fade
+        const easedProgress = 1 - Math.pow(1 - animationProgress.current, 3);
+        
+        if (animationType.current === "shrink" && groupRef.current) {
+            // Bounce effect during shrink
+            const bounce = Math.sin(easedProgress * Math.PI * 2) * 0.05;
+            groupRef.current.position.y = position[1] + bounce;
             
-            if (fadeProgress.current >= 1) {
-                fadeProgress.current = 1;
-                isFading.current = false;
+            // Scale effect
+            const scale = 1 - (easedProgress * 0.2);
+            if (meshRef.current) {
+                meshRef.current.scale.x = scale;
             }
-            
-            // Apply fade to material
+        } else if (animationType.current === "fade") {
+            // Fade animation when consumed
             if (materialRef.current) {
-                materialRef.current.opacity = 1 - fadeProgress.current;
+                materialRef.current.opacity = 1 - easedProgress;
             }
             
             // Scale down as it fades
             if (groupRef.current) {
-                const scale = 1 - (fadeProgress.current * 0.5);
+                const scale = 1 - (easedProgress * 0.5);
                 groupRef.current.scale.setScalar(scale);
             }
         }
     });
     
-    // Calculate current width based on remaining touches
-    const baseWidth = 0.8;
-    const widthPerTouch = baseWidth / touchdown;
-    const currentWidth = widthPerTouch * remainingTouches;
-    
     // Don't render if consumed
-    if (isConsumed) {
+    if (localConsumed) {
         return null;
     }
     
+    // Don't render until initialized
+    if (!isInitialized) {
+        return null;
+    }
+    
+    // Calculate visual properties based on remaining touches
+    const baseWidth = 0.8;
+    const widthPerTouch = baseWidth / touchdown;
+    const currentWidth = Math.max(0.2, widthPerTouch * localRemainingTouches);
+    
     // Color gets darker as touches are consumed
-    const greenIntensity = remainingTouches / touchdown;
-    const color = new THREE.Color().setHSL(0.33, 0.6, 0.3 + greenIntensity * 0.2);
+    const greenIntensity = Math.max(0.2, localRemainingTouches / touchdown);
+    const hue = 0.33; // Green hue
+    const saturation = 0.6;
+    const lightness = 0.3 + greenIntensity * 0.2;
+    const color = new THREE.Color().setHSL(hue, saturation, lightness);
     
     return (
         <group ref={groupRef} position={position}>
@@ -571,7 +622,7 @@ export function GreenPad({ position = [0, 0, 0], coord, touchdown = 1 }: GreenPa
                 autoplay={false}
             />
             
-            <mesh receiveShadow>
+            <mesh ref={meshRef} receiveShadow>
                 <RoundedBox args={[currentWidth, 0.15, 0.5]} radius={0.05} smoothness={4}>
                     <meshStandardMaterial 
                         ref={materialRef}
@@ -585,8 +636,11 @@ export function GreenPad({ position = [0, 0, 0], coord, touchdown = 1 }: GreenPa
             </mesh>
             
             {/* Visual indicator of remaining touches */}
-            {Array.from({ length: remainingTouches }).map((_, i) => (
-                <mesh key={i} position={[(i - (remainingTouches - 1) / 2) * 0.15, 0.1, 0.2]}>
+            {localRemainingTouches > 0 && Array.from({ length: localRemainingTouches }).map((_, i) => (
+                <mesh 
+                    key={i} 
+                    position={[(i - (localRemainingTouches - 1) / 2) * 0.15, 0.1, 0.2]}
+                >
                     <sphereGeometry args={[0.03, 8, 8]} />
                     <meshStandardMaterial 
                         color="#66ff66"
@@ -598,7 +652,6 @@ export function GreenPad({ position = [0, 0, 0], coord, touchdown = 1 }: GreenPa
         </group>
     );
 }
-
 export function UpDoor({ position = [0, 0, 0] }: PadsProps) {
 
   return (

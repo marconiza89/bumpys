@@ -9,6 +9,7 @@ import { useItemsStore } from "@/levels/state/itemsStore";
 import { ItemAtCoord } from "@/levels/util/ItemAtCoord";
 import { ExitDoor } from "@/levels/assets/ExitDoor";
 import { LDoor, RDoor } from "@/levels/assets/Bricks";
+import { useGreenPadsStore } from "@/levels/state/greenPadsStore";
 
 type Props = { data: LevelData };
 
@@ -58,7 +59,9 @@ function RenderBrick(brick: string, coord: string, position: [number, number, nu
 }
 
 export const Level = memo(function Level({ data }: Props) {
-    useEffect(() => {
+ 
+
+useEffect(() => {
         useItemsStore.getState().initFromLevel(data);
     }, [data]);
 

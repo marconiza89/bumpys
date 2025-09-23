@@ -34,22 +34,33 @@ export const useGreenPadsStore = create<GreenPadsStore>((set, get) => ({
     
     initPad: (coord, maxTouches) => {
         const key = coord.toUpperCase();
+        
         set((state) => {
             const newPads = new Map(state.pads);
+            // Always initialize with fresh state
             newPads.set(key, {
                 touchesRemaining: maxTouches,
                 maxTouches: maxTouches,
                 consumed: false
             });
+            console.log(`Store: Initialized pad ${key} with ${maxTouches} touches`);
             return { pads: newPads };
         });
     },
     
-    consumeTouch: (coord) => {
+consumeTouch: (coord) => {
         const key = coord.toUpperCase();
         const pad = get().pads.get(key);
         
-        if (!pad || pad.consumed) return false;
+        if (!pad) {
+            console.warn(`Store: Cannot consume touch - pad ${key} not found!`);
+            return false;
+        }
+        
+        if (pad.consumed) {
+            console.log(`Store: Pad ${key} already consumed`);
+            return true;
+        }
         
         const newTouches = pad.touchesRemaining - 1;
         const isNowConsumed = newTouches <= 0;
@@ -61,6 +72,9 @@ export const useGreenPadsStore = create<GreenPadsStore>((set, get) => ({
                 touchesRemaining: Math.max(0, newTouches),
                 consumed: isNowConsumed
             });
+            
+            console.log(`Store: Pad ${key} consumed touch. Remaining: ${Math.max(0, newTouches)}, Consumed: ${isNowConsumed}`);
+            
             return { pads: newPads };
         });
         
@@ -70,16 +84,30 @@ export const useGreenPadsStore = create<GreenPadsStore>((set, get) => ({
     isPadConsumed: (coord) => {
         const key = coord.toUpperCase();
         const pad = get().pads.get(key);
-        return pad?.consumed ?? false;
+        
+        // Return false if pad doesn't exist (not consumed, just not initialized yet)
+        if (!pad) {
+            return false;
+        }
+        
+        return pad.consumed;
     },
     
     getRemainingTouches: (coord) => {
         const key = coord.toUpperCase();
         const pad = get().pads.get(key);
-        return pad?.touchesRemaining ?? 0;
+        
+        // Return 0 if pad doesn't exist (safe default)
+        if (!pad) {
+            return 0;
+        }
+        
+        return pad.touchesRemaining;
     },
     
     resetFromLevel: () => {
+        console.log(`Store: Resetting all pads to initial state`);
+        
         // Re-initialize all pads to their original state
         const currentPads = get().pads;
         const newPads = new Map<string, GreenPadState>();
@@ -96,6 +124,7 @@ export const useGreenPadsStore = create<GreenPadsStore>((set, get) => ({
     },
     
     reset: () => {
+        console.log(`Store: Clearing all pads`);
         set({ pads: new Map() });
     }
 }));

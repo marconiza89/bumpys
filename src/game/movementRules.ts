@@ -158,7 +158,7 @@ export async function initMovementRules(options?: {
             if (options?.padData) {
                 PAD_JSON = options.padData;
             } else {
-                const url = options?.padUrl ?? "/levels/config/padAction.json";
+                const url = options?.padUrl ?? "/levels/pads/padAction.json";
                 PAD_JSON = await fetchJson<RawPadAction>(url);
             }
         } catch (e) {
@@ -170,7 +170,7 @@ export async function initMovementRules(options?: {
             if (options?.brickData) {
                 BRICK_JSON = options.brickData;
             } else {
-                const url = options?.brickUrl ?? "/levels/config/brickAction.json";
+                const url = options?.brickUrl ?? "/levels/pads/brickAction.json";
                 BRICK_JSON = await fetchJson<RawBrickAction>(url);
             }
         } catch (e) {

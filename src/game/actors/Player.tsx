@@ -88,8 +88,7 @@ export function Player({ data }: PlayerProps) {
         for (const c of data.cells) m.set(c.coord.toUpperCase(), c.pad !== "empty");
         return m;
     }, [data, rows, colStart, colEnd]);
-
- const isPadAt = (rowIndex: number, colIndex: number) => {
+const isPadAt = (rowIndex: number, colIndex: number) => {
     if (rowIndex < 0 || rowIndex >= rowsCount) return false;
     if (colIndex < 0 || colIndex >= colsCount) return false;
     const coord = toCoord(rows, colStart, rowIndex, colIndex);
@@ -298,12 +297,34 @@ useEffect(() => {
 
     const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
     useItemsStore.getState().collectAt(spawnCoord);
-    
-    // Reset green pads for new level/restart
-    useGreenPadsStore.getState().reset();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
+
+useEffect(() => {
+        if (vStateRef.current !== "idle" || movingRef.current) return;
+        
+        // Subscribe to green pad changes
+        const unsubscribe = useGreenPadsStore.subscribe((state) => {
+            // If we're idle and not moving, check if the pad under us is still solid
+            if (vStateRef.current === "idle" && !movingRef.current) {
+                const currentCoord = toCoord(rows, colStart, rowIndex, colIndex);
+                const cellMap = cellsMap(data);
+                const cell = cellMap.get(currentCoord.toUpperCase());
+                const padType = cell?.pad ?? data.defaults.pad;
+                
+                // If we're on a green pad that just got consumed, start falling
+                if (padType === "green1" || padType === "green2") {
+                    if (state.isPadConsumed(currentCoord)) {
+                        console.log(`Player: Green pad ${currentCoord} consumed under player, starting fall`);
+                        setVState("descend");
+                    }
+                }
+            }
+        });
+        
+        return () => unsubscribe();
+    }, [rowIndex, colIndex, data, rows, colStart]);
 
     useFrame((_, dt) => {
         // Bounce animation only in idle
