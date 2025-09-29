@@ -51,6 +51,7 @@ export function Player({ data }: PlayerProps) {
     const tileSize = data.meta.grid.tileSize ?? 1;
     const landedFromRef = useRef<VState | null>(null);
     const [bouncedcount, setBouncedcount] = useState(false);
+    const nextBounceCheckRef = useRef(false);
 
     const wallBounceRef = useRef<{
         active: boolean;
@@ -272,47 +273,41 @@ const isPadAt = (rowIndex: number, colIndex: number) => {
     }
 
 function onBounceGround() {
-        
-        const coord = toCoord(rows, colStart, rowIndex, colIndex);
-        publishPadEvent(coord, "bounce");
-
-        // Check if the pad we just bounced on is still solid
-        // This is important for green pads that might get consumed
-        
-            if (vStateRef.current === "idle" && !movingRef.current) {
-                // Re-check if there's still a pad under us
-                if (!isPadAt(rowIndex, colIndex)) {
-                    console.log(`Player: Pad at ${coord} no longer solid after bounce, starting fall`);
-                    setBouncedcount(true);
-               
-                    //     setVState("descend");
-                    //     pauseBounce();
-             
-                }
-            }
-
-            
-            if (vStateRef.current === "idle" && !movingRef.current  && bouncedcount) {
-                // Re-check if there's still a pad under us
-                if (!isPadAt(rowIndex, colIndex)) {
-                    console.log(`Player: Pad at ${coord} no longer solid after bounce, starting fall`);
-                    
-               
-                        setVState("descend");
-                        pauseBounce();
-                   
-              setBouncedcount(false);
-                }
-            }
-
-       
-
-        if (vStateRef.current === "idle" && queuedGroundActionRef.current) {
-            const fn = queuedGroundActionRef.current;
-            queuedGroundActionRef.current = undefined;
-            fn();
-        }
+    const coord = toCoord(rows, colStart, rowIndex, colIndex);
+    
+    // Check if the pad exists BEFORE publishing the bounce
+    const padExistsBeforeBounce = isPadAt(rowIndex, colIndex);
+    
+    // Publish the bounce event (normal bounce from above, not a ceiling hit)
+    publishPadEvent(coord, "bounce", { fromBelow: false });
+    
+    // Check if the pad exists AFTER publishing the bounce
+    const padExistsAfterBounce = isPadAt(rowIndex, colIndex);
+    
+    // If the pad existed before but not after, it was just consumed
+    // Mark that the NEXT bounce should trigger a fall
+    if (padExistsBeforeBounce && !padExistsAfterBounce) {
+        console.log(`Player: Green pad ${coord} was just consumed, next bounce will trigger fall`);
+        // Set a flag that will be checked on the NEXT bounce
+        nextBounceCheckRef.current = true;
+    } else if (nextBounceCheckRef.current && !padExistsAfterBounce) {
+        // This is the bounce AFTER consumption - now we should fall
+        console.log(`Player: Bouncing on consumed pad ${coord}, starting fall`);
+        nextBounceCheckRef.current = false;
+        // Don't interrupt the current bounce animation
+        // Queue the fall for when the ball reaches the ground again
+        queuedGroundActionRef.current = () => {
+            setVState("descend");
+            pauseBounce();
+        };
     }
+
+    if (vStateRef.current === "idle" && queuedGroundActionRef.current) {
+        const fn = queuedGroundActionRef.current;
+        queuedGroundActionRef.current = undefined;
+        fn();
+    }
+}
 
     // World pos
     const BALL_Z = 0.3;
@@ -372,13 +367,12 @@ useEffect(() => {
 
     useFrame((_, dt) => {
 
-        // Check if ground disappeared while idle
-        if (vStateRef.current === "idle" && !movingRef.current && !bounceActiveRef.current) {
-            if (!isPadAt(rowIndex, colIndex)) {
-                console.log(`Player: Ground disappeared, starting fall`);
-                setVState("descend");
-            }
+if (vStateRef.current === "idle" && !movingRef.current && !bounceActiveRef.current) {
+        if (!isPadAt(rowIndex, colIndex)) {
+            console.log(`Player: Ground disappeared while idle, starting fall`);
+            setVState("descend");
         }
+    }
         // Bounce animation only in idle
 if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.current && moveKindRef.current !== "side" && ballRef.current) {
             const prev = bouncePRef.current;

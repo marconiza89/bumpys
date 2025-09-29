@@ -2,7 +2,7 @@
   "meta": {
     "id": "lvl-001",
     "name": "Level 1",
-    "grid": { "rows": "A-F", "cols": [1,8], "tileSize": 1 },
+    "grid": { "rows": "A-F", "cols": [1,8], "tileSize": 1.2 },
     "theme": "factory"    
   },
   "defaults": {

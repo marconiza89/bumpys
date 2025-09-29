@@ -496,11 +496,35 @@ export function GreenPad({ position = [0, 0, 0], coord = "", touchdown = 1 }: Gr
   }, [isInitialized, coord, localRemainingTouches, localConsumed]);
 
   // Subscribe to bounce events
-  useEffect(() => {
+useEffect(() => {
     if (!coord || !isInitialized) return;
 
     const unsubscribe = subscribePadEvents(coord, (e: PadEvent) => {
       if (e.type === "bounce") {
+        // Check if this is a ceiling hit (fromBelow: true)
+        if (e.payload?.fromBelow) {
+          console.log(`GreenPad ${coord}: Hit from below, not consuming`);
+          
+          // Play a different sound or animation for ceiling hits if desired
+          const a = audioRef.current;
+          if (a) {
+            try {
+              // Higher pitch for ceiling hit
+              a.setPlaybackRate(1.5);
+              if (a.isPlaying) a.stop();
+              if (a.context.state === "suspended") a.context.resume();
+              a.play();
+            } catch (err) {
+              console.error("Error playing audio:", err);
+            }
+          }
+          
+          // Could add a different animation here for ceiling hits
+          // For now, just return without consuming
+          return;
+        }
+
+        // Normal bounce from above - consume as usual
         const store = useGreenPadsStore.getState();
 
         // Check current state
