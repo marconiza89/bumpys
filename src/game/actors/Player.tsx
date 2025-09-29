@@ -270,9 +270,22 @@ const isPadAt = (rowIndex: number, colIndex: number) => {
         queuedGroundActionRef.current = action;
     }
 
-    function onBounceGround() {
+function onBounceGround() {
         const coord = toCoord(rows, colStart, rowIndex, colIndex);
         publishPadEvent(coord, "bounce");
+
+        // Check if the pad we just bounced on is still solid
+        // This is important for green pads that might get consumed
+        setTimeout(() => {
+            if (vStateRef.current === "idle" && !movingRef.current) {
+                // Re-check if there's still a pad under us
+                if (!isPadAt(rowIndex, colIndex)) {
+                    console.log(`Player: Pad at ${coord} no longer solid after bounce, starting fall`);
+                    setVState("descend");
+                    pauseBounce();
+                }
+            }
+        }, 50); // Small delay to let the green pad update
 
         if (vStateRef.current === "idle" && queuedGroundActionRef.current) {
             const fn = queuedGroundActionRef.current;
@@ -302,22 +315,25 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-        if (vStateRef.current !== "idle" || movingRef.current) return;
-        
-        // Subscribe to green pad changes
-        const unsubscribe = useGreenPadsStore.subscribe((state) => {
-            // If we're idle and not moving, check if the pad under us is still solid
+        const unsubscribe = useGreenPadsStore.subscribe(() => {
+            // Check if we're idle and not moving
             if (vStateRef.current === "idle" && !movingRef.current) {
-                const currentCoord = toCoord(rows, colStart, rowIndex, colIndex);
+                const currentRowIndex = rowIndex;
+                const currentColIndex = colIndex;
+                const currentCoord = toCoord(rows, colStart, currentRowIndex, currentColIndex);
+                
+                // Check if current position is a green pad
                 const cellMap = cellsMap(data);
                 const cell = cellMap.get(currentCoord.toUpperCase());
                 const padType = cell?.pad ?? data.defaults.pad;
                 
-                // If we're on a green pad that just got consumed, start falling
                 if (padType === "green1" || padType === "green2") {
-                    if (state.isPadConsumed(currentCoord)) {
+                    const greenPadStore = useGreenPadsStore.getState();
+                    if (greenPadStore.isPadConsumed(currentCoord)) {
                         console.log(`Player: Green pad ${currentCoord} consumed under player, starting fall`);
                         setVState("descend");
+                        // Force immediate descent check
+                        resolveMotion();
                     }
                 }
             }
@@ -327,8 +343,16 @@ useEffect(() => {
     }, [rowIndex, colIndex, data, rows, colStart]);
 
     useFrame((_, dt) => {
+
+        // Check if ground disappeared while idle
+        if (vStateRef.current === "idle" && !movingRef.current && !bounceActiveRef.current) {
+            if (!isPadAt(rowIndex, colIndex)) {
+                console.log(`Player: Ground disappeared, starting fall`);
+                setVState("descend");
+            }
+        }
         // Bounce animation only in idle
-        if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.current && moveKindRef.current !== "side" && ballRef.current) {
+if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.current && moveKindRef.current !== "side" && ballRef.current) {
             const prev = bouncePRef.current;
             const p = (prev + BOUNCE_FREQ * dt) % 1;
             bouncePRef.current = p;

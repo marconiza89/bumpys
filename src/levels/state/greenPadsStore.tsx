@@ -62,7 +62,7 @@ consumeTouch: (coord) => {
             return true;
         }
         
-        const newTouches = pad.touchesRemaining - 1;
+        const newTouches = pad.touchesRemaining - 1  ;
         const isNowConsumed = newTouches <= 0;
         
         set((state) => {
