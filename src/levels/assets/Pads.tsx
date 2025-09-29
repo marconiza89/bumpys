@@ -601,8 +601,8 @@ export function GreenPad({ position = [0, 0, 0], coord = "", touchdown = 1 }: Gr
 
   // Calculate visual properties based on remaining touches
   const baseWidth = 0.8;
-  const widthPerTouch = baseWidth / touchdown /3;
-  const currentWidth = Math.max(0.2, widthPerTouch * localRemainingTouches);
+  const widthPerStep = baseWidth / 3;
+  const currentWidth = Math.max(0.2, widthPerStep * (localRemainingTouches) );
 
   // Color gets darker as touches are consumed
   const greenIntensity = Math.max(0.2, localRemainingTouches / touchdown);

@@ -50,6 +50,7 @@ export function Player({ data }: PlayerProps) {
     const rowsCount = rows.length;
     const tileSize = data.meta.grid.tileSize ?? 1;
     const landedFromRef = useRef<VState | null>(null);
+    const [bouncedcount, setBouncedcount] = useState(false);
 
     const wallBounceRef = useRef<{
         active: boolean;
@@ -271,21 +272,40 @@ const isPadAt = (rowIndex: number, colIndex: number) => {
     }
 
 function onBounceGround() {
+        
         const coord = toCoord(rows, colStart, rowIndex, colIndex);
         publishPadEvent(coord, "bounce");
 
         // Check if the pad we just bounced on is still solid
         // This is important for green pads that might get consumed
-        setTimeout(() => {
+        
             if (vStateRef.current === "idle" && !movingRef.current) {
                 // Re-check if there's still a pad under us
                 if (!isPadAt(rowIndex, colIndex)) {
                     console.log(`Player: Pad at ${coord} no longer solid after bounce, starting fall`);
-                    setVState("descend");
-                    pauseBounce();
+                    setBouncedcount(true);
+               
+                    //     setVState("descend");
+                    //     pauseBounce();
+             
                 }
             }
-        }, 50); // Small delay to let the green pad update
+
+            
+            if (vStateRef.current === "idle" && !movingRef.current  && bouncedcount) {
+                // Re-check if there's still a pad under us
+                if (!isPadAt(rowIndex, colIndex)) {
+                    console.log(`Player: Pad at ${coord} no longer solid after bounce, starting fall`);
+                    
+               
+                        setVState("descend");
+                        pauseBounce();
+                   
+              setBouncedcount(false);
+                }
+            }
+
+       
 
         if (vStateRef.current === "idle" && queuedGroundActionRef.current) {
             const fn = queuedGroundActionRef.current;
@@ -308,8 +328,16 @@ useEffect(() => {
     if (groupRef.current) groupRef.current.position.copy(start);
     setVState(isPadAt(rowIndex, colIndex) ? "idle" : "descend");
 
+    // Only collect items on spawn, not green pads
     const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
-    useItemsStore.getState().collectAt(spawnCoord);
+    const cellMap = cellsMap(data);
+    const cell = cellMap.get(spawnCoord.toUpperCase());
+    const itemType = cell?.item ?? data.defaults.item;
+    
+    // Only collect actual items, not trigger green pad consumption
+    if (itemType && itemType !== "none") {
+        useItemsStore.getState().collectAt(spawnCoord);
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
@@ -331,9 +359,9 @@ useEffect(() => {
                     const greenPadStore = useGreenPadsStore.getState();
                     if (greenPadStore.isPadConsumed(currentCoord)) {
                         console.log(`Player: Green pad ${currentCoord} consumed under player, starting fall`);
-                        setVState("descend");
+                        // setVState("descend");
                         // Force immediate descent check
-                        resolveMotion();
+                        // resolveMotion();
                     }
                 }
             }
