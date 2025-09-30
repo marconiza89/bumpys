@@ -90,30 +90,30 @@ export function Player({ data }: PlayerProps) {
         for (const c of data.cells) m.set(c.coord.toUpperCase(), c.pad !== "empty");
         return m;
     }, [data, rows, colStart, colEnd]);
-const isPadAt = (rowIndex: number, colIndex: number) => {
-    if (rowIndex < 0 || rowIndex >= rowsCount) return false;
-    if (colIndex < 0 || colIndex >= colsCount) return false;
-    const coord = toCoord(rows, colStart, rowIndex, colIndex);
-    
-    // Check if the pad exists in the map
-    const hasPad = padMap.get(coord.toUpperCase()) === true;
-    
-    if (!hasPad) return false;
-    
-    // Check if it's a green pad that has been consumed
-    const cellMap = cellsMap(data);
-    const cell = cellMap.get(coord.toUpperCase());
-    const padType = cell?.pad ?? data.defaults.pad;
-    
-    if (padType === "green1" || padType === "green2" || padType === "green3" || padType === "green3") {
-        const greenPadStore = useGreenPadsStore.getState();
-        if (greenPadStore.isPadConsumed(coord)) {
-            return false; // Treat consumed green pad as empty
+    const isPadAt = (rowIndex: number, colIndex: number) => {
+        if (rowIndex < 0 || rowIndex >= rowsCount) return false;
+        if (colIndex < 0 || colIndex >= colsCount) return false;
+        const coord = toCoord(rows, colStart, rowIndex, colIndex);
+
+        // Check if the pad exists in the map
+        const hasPad = padMap.get(coord.toUpperCase()) === true;
+
+        if (!hasPad) return false;
+
+        // Check if it's a green pad that has been consumed
+        const cellMap = cellsMap(data);
+        const cell = cellMap.get(coord.toUpperCase());
+        const padType = cell?.pad ?? data.defaults.pad;
+
+        if (padType === "green1" || padType === "green2" || padType === "green3") {
+            const greenPadStore = useGreenPadsStore.getState();
+            if (greenPadStore.isPadConsumed(coord)) {
+                return false; // Treat consumed green pad as empty
+            }
         }
-    }
-    
-    return true;
-};
+
+        return true;
+    };
 
     // Spawn
     const { spawnRow, spawnCol } = useMemo(() => {
@@ -272,42 +272,42 @@ const isPadAt = (rowIndex: number, colIndex: number) => {
         queuedGroundActionRef.current = action;
     }
 
-function onBounceGround() {
-    const coord = toCoord(rows, colStart, rowIndex, colIndex);
-    
-    // Check if the pad exists BEFORE publishing the bounce
-    const padExistsBeforeBounce = isPadAt(rowIndex, colIndex);
-    
-    // Publish the bounce event (normal bounce from above, not a ceiling hit)
-    publishPadEvent(coord, "bounce", { fromBelow: false });
-    
-    // Check if the pad exists AFTER publishing the bounce
-    const padExistsAfterBounce = isPadAt(rowIndex, colIndex);
-    
-    // If the pad existed before but not after, it was just consumed
-    // Mark that the NEXT bounce should trigger a fall
-    if (padExistsBeforeBounce && !padExistsAfterBounce) {
-        console.log(`Player: Green pad ${coord} was just consumed, next bounce will trigger fall`);
-        // Set a flag that will be checked on the NEXT bounce
-        nextBounceCheckRef.current = true;
-    } else if (nextBounceCheckRef.current && !padExistsAfterBounce) {
-        // This is the bounce AFTER consumption - now we should fall
-        console.log(`Player: Bouncing on consumed pad ${coord}, starting fall`);
-        nextBounceCheckRef.current = false;
-        // Don't interrupt the current bounce animation
-        // Queue the fall for when the ball reaches the ground again
-        queuedGroundActionRef.current = () => {
-            setVState("descend");
-            pauseBounce();
-        };
-    }
+    function onBounceGround() {
+        const coord = toCoord(rows, colStart, rowIndex, colIndex);
 
-    if (vStateRef.current === "idle" && queuedGroundActionRef.current) {
-        const fn = queuedGroundActionRef.current;
-        queuedGroundActionRef.current = undefined;
-        fn();
+        // Check if the pad exists BEFORE publishing the bounce
+        const padExistsBeforeBounce = isPadAt(rowIndex, colIndex);
+
+        // Publish the bounce event (normal bounce from above, not a ceiling hit)
+        publishPadEvent(coord, "bounce", { fromBelow: false });
+
+        // Check if the pad exists AFTER publishing the bounce
+        const padExistsAfterBounce = isPadAt(rowIndex, colIndex);
+
+        // If the pad existed before but not after, it was just consumed
+        // Mark that the NEXT bounce should trigger a fall
+        if (padExistsBeforeBounce && !padExistsAfterBounce) {
+            console.log(`Player: Green pad ${coord} was just consumed, next bounce will trigger fall`);
+            // Set a flag that will be checked on the NEXT bounce
+            nextBounceCheckRef.current = true;
+        } else if (nextBounceCheckRef.current && !padExistsAfterBounce) {
+            // This is the bounce AFTER consumption - now we should fall
+            console.log(`Player: Bouncing on consumed pad ${coord}, starting fall`);
+            nextBounceCheckRef.current = false;
+            // Don't interrupt the current bounce animation
+            // Queue the fall for when the ball reaches the ground again
+            queuedGroundActionRef.current = () => {
+                setVState("descend");
+                pauseBounce();
+            };
+        }
+
+        if (vStateRef.current === "idle" && queuedGroundActionRef.current) {
+            const fn = queuedGroundActionRef.current;
+            queuedGroundActionRef.current = undefined;
+            fn();
+        }
     }
-}
 
     // World pos
     const BALL_Z = 0.3;
@@ -317,64 +317,64 @@ function onBounceGround() {
         return new Vector3(x, y, z);
     };
 
-useEffect(() => {
-    const start = computeWorld(rowIndex, colIndex);
-    targetWorld.current.copy(start);
-    if (groupRef.current) groupRef.current.position.copy(start);
-    setVState(isPadAt(rowIndex, colIndex) ? "idle" : "descend");
+    useEffect(() => {
+        const start = computeWorld(rowIndex, colIndex);
+        targetWorld.current.copy(start);
+        if (groupRef.current) groupRef.current.position.copy(start);
+        setVState(isPadAt(rowIndex, colIndex) ? "idle" : "descend");
 
-    // Only collect items on spawn, not green pads
-    const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
-    const cellMap = cellsMap(data);
-    const cell = cellMap.get(spawnCoord.toUpperCase());
-    const itemType = cell?.item ?? data.defaults.item;
-    
-    // Only collect actual items, not trigger green pad consumption
-    if (itemType && itemType !== "none") {
-        useItemsStore.getState().collectAt(spawnCoord);
-    }
+        // Only collect items on spawn, not green pads
+        const spawnCoord = toCoord(rows, colStart, rowIndex, colIndex);
+        const cellMap = cellsMap(data);
+        const cell = cellMap.get(spawnCoord.toUpperCase());
+        const itemType = cell?.item ?? data.defaults.item;
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+        // Only collect actual items, not trigger green pad consumption
+        if (itemType && itemType !== "none") {
+            useItemsStore.getState().collectAt(spawnCoord);
+        }
 
-useEffect(() => {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
         const unsubscribe = useGreenPadsStore.subscribe(() => {
             // Check if we're idle and not moving
             if (vStateRef.current === "idle" && !movingRef.current) {
                 const currentRowIndex = rowIndex;
                 const currentColIndex = colIndex;
                 const currentCoord = toCoord(rows, colStart, currentRowIndex, currentColIndex);
-                
+
                 // Check if current position is a green pad
                 const cellMap = cellsMap(data);
                 const cell = cellMap.get(currentCoord.toUpperCase());
                 const padType = cell?.pad ?? data.defaults.pad;
-                
+
                 if (padType === "green1" || padType === "green2" || padType === "green3") {
                     const greenPadStore = useGreenPadsStore.getState();
                     if (greenPadStore.isPadConsumed(currentCoord)) {
                         console.log(`Player: Green pad ${currentCoord} consumed under player, starting fall`);
                         // setVState("descend");
                         // Force immediate descent check
-                        // resolveMotion();
+                        resolveMotion();
                     }
                 }
             }
         });
-        
+
         return () => unsubscribe();
     }, [rowIndex, colIndex, data, rows, colStart]);
 
     useFrame((_, dt) => {
 
-if (vStateRef.current === "idle" && !movingRef.current && !bounceActiveRef.current) {
-        if (!isPadAt(rowIndex, colIndex)) {
-            console.log(`Player: Ground disappeared while idle, starting fall`);
-            setVState("descend");
+        if (vStateRef.current === "idle" && !movingRef.current && !bounceActiveRef.current) {
+            if (!isPadAt(rowIndex, colIndex)) {
+                console.log(`Player: Ground disappeared while idle, starting fall`);
+                setVState("descend");
+            }
         }
-    }
         // Bounce animation only in idle
-if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.current && moveKindRef.current !== "side" && ballRef.current) {
+        if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.current && moveKindRef.current !== "side" && ballRef.current) {
             const prev = bouncePRef.current;
             const p = (prev + BOUNCE_FREQ * dt) % 1;
             bouncePRef.current = p;
@@ -460,7 +460,7 @@ if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.curren
 
             // Arco della palla durante il bounce
             if (ballRef.current) {
-                const y = BALL_MIN_Y + (BALL_MAX_Y - BALL_MIN_Y) * Math.sin(Math.PI * progress) /8;
+                const y = BALL_MIN_Y + (BALL_MAX_Y - BALL_MIN_Y) * Math.sin(Math.PI * progress) / 8;
                 ballRef.current.position.y = y;
             }
 
@@ -704,7 +704,7 @@ if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.curren
 
         movingRef.current = true;
         pauseBounce();
-        if (ballRef.current) ballRef.current.position.y = BALL_MIN_Y ;
+        if (ballRef.current) ballRef.current.position.y = BALL_MIN_Y;
     }
 
     function canMoveTo(r: number, c: number) {
