@@ -620,7 +620,7 @@ export function Player({ data }: PlayerProps) {
         }
     }
 
-    function onArrived() {
+function onArrived() {
         const cb = arrivalCallbackRef.current;
         arrivalCallbackRef.current = undefined;
         if (cb) cb();
@@ -650,12 +650,25 @@ export function Player({ data }: PlayerProps) {
         }
 
         if (vStateRef.current === "idle") {
+            // Check if up is pressed after a side movement - jump immediately
+            if (moveKindRef.current === "side" && inputRef.current.up) {
+                inputRef.current.up = false;
+                const coord = toCoord(rows, colStart, rowIndex, colIndex);
+                publishPadEvent(coord, "trampoline");
+                setVState("ascend");
+                tryAscend();
+                moveKindRef.current = "none";
+                return;
+            }
+            
             onBounceGround();
             const suppressResume =
                 (landedFromRef.current === "descend" &&
                     (inputRef.current.up || inputRef.current.left || inputRef.current.right)) ||
                 (landedFromRef.current === "ascend" &&
-                    (inputRef.current.left || inputRef.current.right || pendingSideRef.current !== 0));
+                    (inputRef.current.left || inputRef.current.right || pendingSideRef.current !== 0)) ||
+                (moveKindRef.current === "side" && 
+                    (inputRef.current.up || inputRef.current.left || inputRef.current.right));
             if (!suppressResume) {
                 resumeBounceFromGround();
             }
