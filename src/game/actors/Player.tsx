@@ -105,7 +105,7 @@ const isPadAt = (rowIndex: number, colIndex: number) => {
     const cell = cellMap.get(coord.toUpperCase());
     const padType = cell?.pad ?? data.defaults.pad;
     
-    if (padType === "green1" || padType === "green2") {
+    if (padType === "green1" || padType === "green2" || padType === "green3" || padType === "green3") {
         const greenPadStore = useGreenPadsStore.getState();
         if (greenPadStore.isPadConsumed(coord)) {
             return false; // Treat consumed green pad as empty
@@ -350,7 +350,7 @@ useEffect(() => {
                 const cell = cellMap.get(currentCoord.toUpperCase());
                 const padType = cell?.pad ?? data.defaults.pad;
                 
-                if (padType === "green1" || padType === "green2") {
+                if (padType === "green1" || padType === "green2" || padType === "green3") {
                     const greenPadStore = useGreenPadsStore.getState();
                     if (greenPadStore.isPadConsumed(currentCoord)) {
                         console.log(`Player: Green pad ${currentCoord} consumed under player, starting fall`);
@@ -826,7 +826,7 @@ if (bounceActiveRef.current && vStateRef.current === "idle" && !movingRef.curren
             }
 
             if (hitCoord) {
-                publishPadEvent(hitCoord, "bounce");
+                publishPadEvent(hitCoord, "hitfrombottom");
                 performCeilingBounce();
             }
 

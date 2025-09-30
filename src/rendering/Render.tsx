@@ -21,7 +21,7 @@ export function Render() {
     useEffect(() => {
         let active = true;
         (async () => {
-            const res = await fetch("/levels/data/Levelref.json");
+            const res = await fetch("/levels/data/Level3.json");
             const data = (await res.json()) as LevelData;
             if (active) setLevel(data);
         })();

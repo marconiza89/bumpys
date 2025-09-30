@@ -91,6 +91,7 @@ const PAD_TYPE_MAP: Record<string, PadInteractionType> = {
     "downdoor": "door_teleport",
     "green1": "normal_bounce",
     "green2": "normal_bounce",
+    "green3": "normal_bounce",
 };
 
 export const useInteractionStore = create<InteractionState>((set, get) => ({

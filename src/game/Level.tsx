@@ -30,6 +30,8 @@ function renderPad(pad: string, coord: string, position: [number, number, number
             return <GreenPad touchdown={1} key={`${pad}-${coord}`} coord={coord} position={position} />;
         case "green2":
             return <GreenPad touchdown={2} key={`${pad}-${coord}`} coord={coord} position={position} />;
+            case "green3":
+            return <GreenPad touchdown={3} key={`${pad}-${coord}`} coord={coord} position={position} />;
         case "updoor":
             return <UpDoor key={`${pad}-${coord}`} coord={coord} position={position} />;
         case "downdoor":

@@ -20,7 +20,7 @@ export function isEffectivelyEmptyPad(data: LevelData, coord: string): boolean {
     }
     
     // Check if it's a consumed green pad
-    if (padType === "green1" || padType === "green2") {
+    if (padType === "green1" || padType === "green2" || padType === "green3") {
         const greenPadStore = useGreenPadsStore.getState();
         if (greenPadStore.isPadConsumed(coord)) {
             return true;

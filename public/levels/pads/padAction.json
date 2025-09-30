@@ -33,8 +33,9 @@
         "rtrampoline": { "RightRebounce": "true", "RightRebounceStrong": "2", "TopRebouncer": "true" },
         "ltrampoline": { "LeftRebounce": "true", "LeftRebounceStrong": "2", "TopRebouncer": "true" },
         "ice": { "IcePad": "true" },
-        "green1": { "Consumable": "true", "ConsumableBounce": "2" },
-        "green2": { "Consumable": "true", "ConsumableBounce": "3" },
+        "green1": { "Consumable": "true", "ConsumableBounce": "1" },
+        "green2": { "Consumable": "true", "ConsumableBounce": "2" },
+        "green3": { "Consumable": "true", "ConsumableBounce": "3" },
         "toptrap": { "BounceTopDamage": "true"   },
         "updoor": { "BottomEntry": "true"  },
         "downdoor": { "BottomExit": "true" }

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type PadEventType = "bounce" | "tilt" | "trampoline";
+export type PadEventType = "bounce" | "tilt" | "trampoline" | "hitfrombottom";
 export type PadEvent = {
     id: number;
     coord: string;

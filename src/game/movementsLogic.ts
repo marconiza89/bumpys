@@ -53,7 +53,7 @@ function isPadEmptyAt(data: LevelData, coord: string): boolean {
     if (padId === "empty") return true;
     
     // Check if it's a consumed green pad
-    if (padId === "green1" || padId === "green2") {
+    if (padId === "green1" || padId === "green2" || padId === "green3") {
         const greenPadStore = useGreenPadsStore.getState();
         if (greenPadStore.isPadConsumed(coord)) {
             return true; // Treat as empty if consumed
